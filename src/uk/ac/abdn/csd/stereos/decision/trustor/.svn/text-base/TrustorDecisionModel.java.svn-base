@@ -1,0 +1,58 @@
+package uk.ac.abdn.csd.stereos.decision.trustor;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+
+import java.util.Map;
+
+/**
+ * This abstract class defines some shared functionality for decision models.
+ * 
+ * @author cburnett
+ *
+ */
+public abstract class TrustorDecisionModel {
+	
+	
+	/**
+	 * We maintain a reference to the owner of the trust model so that we can 'sign' contracts.
+	 * TODO - REMOVE IF UNNEEDED
+	 */
+	protected Agent owner;
+	
+	/**
+	 * The basic partner selection method. Should evaluate a bunch of partners and select one,
+	 * specified in a 'contract' which details the incentive structure for the delegation. For the simple
+	 * (non-decision-theoretic) cases, the contract can just specify anything.
+	 * 
+	 * @param unconditionalOpinions
+	 * @param conditionalOpinions 
+	 * @param uSucc
+	 * @param uFail
+	 * @param uAbs
+	 * @param monitoringCost 
+	 * @return
+	 */
+	public abstract Delegation selectAgent(Map<Agent,Double> unconditionalOpinions, Map<Agent, Map<EffortLevel, Double>> conditionalOpinions, double uSucc, double uFail, double uAbs, double monitoringCost);
+
+	/**
+	 * Get the 'owner' of this decision model
+	 * @return
+	 */
+	public Agent getOwner() {
+		return owner;
+	}
+
+	/**
+	 * Set the 'owner' of this decision model
+	 * @param owner
+	 */
+	public void setOwner(Agent owner) {
+		this.owner = owner;
+	}
+
+	public abstract Delegation selectAgent(Map<Agent, Double> agents, double uSucc, double uFail, double uAbs, double monitoringCost);
+	
+
+}

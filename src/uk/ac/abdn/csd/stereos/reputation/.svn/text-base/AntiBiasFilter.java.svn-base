@@ -1,0 +1,349 @@
+package uk.ac.abdn.csd.stereos.reputation;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
+
+import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.learning.TwoStageLearner;
+import uk.ac.abdn.csd.stereos.learning.Learner;
+import uk.ac.abdn.csd.stereos.trust.sl.Opinion;
+
+
+/**
+ * The antibias filter is meant to detect biased recommenders and discard them.
+ * This should work for recommenders with perceptual biases, and recommenders who
+ * are subject to biased trustor behaviours.
+ * 
+ * @author cburnett
+ *
+ */
+public class AntiBiasFilter implements ReputationFilter {
+
+	/**
+	 * Reference to the trustor using this filter, so that we can reason about its features
+	 */
+	private Agent trustor;
+	
+	/**
+	 * The two stage learner instance used to classify the opinions
+	 */
+	private TwoStageLearner learner;
+	
+	/**
+	 * Number of clusters to attempt to find (default: 3)
+	 */
+	private int noClusters;
+	
+	/**
+	 * Variance threshold, factor of standard deviations from the mean opinion.
+	 * Default: 1
+	 */
+	private double threshold;
+	
+	/**
+	 * Interval between recomputing detected biases. We don't want to be doing this
+	 * computation every time for every single candidate, but to avoid a cold start problem
+	 * this also means we need to be careful of starting too early and shutting off 
+	 * reputation providers whose only crime is being uncertain :)
+	 * Default: 10.
+	 */
+	private int learningInterval;
+
+	/**
+	 * Cached provider lists this model will use to save on recomputing all the time.
+	 */
+	private Map<Agent,List<Agent>> cache;
+	
+	/**
+	 * 'Remember' the opinions of providers so we don't end up with trickles of
+	 * data in the ad-hoc team condition
+	 */
+	private Map<Agent,Map<Agent,Opinion>> memory;
+	
+	/**
+	 * Maintain a structure mapping agents(trustees) to how long we've been 
+	 * storing opinions about agents, so the memory doesn't overflow as agents
+	 * leave (missing in action list)
+	 */
+	private Map<Agent,Integer> miaList;
+	
+	/**
+	 * Number of invocations to remember agents in memory when they are unseen
+	 */
+	private int timeToLive;
+	
+	/**
+	 * Flag to indicate whether the filter is ready yet. If it's not, it just returns
+	 * the agents its been given (bypass)
+	 */
+	private boolean isReady;
+	
+	/**
+	 * Create a new antibias filter with a threshold value of 0.05 standard deviation from
+	 * the mean, and 3 clusters. Learning interval default is 10. Time to keep agents in
+	 * memory when they are not seen: 30 invocations.
+	 * 
+	 * @param trustor 'owner' of this filter
+	 */
+	public AntiBiasFilter(Agent trustor)
+	{
+		this.trustor = trustor;
+		noClusters = 3;
+		threshold = 0.05;
+		learningInterval = 10;
+		timeToLive = 30;
+		learner = new TwoStageLearner(noClusters,false);
+		cache = new HashMap<Agent,List<Agent>>();
+		memory = new HashMap<Agent,Map<Agent,Opinion>>();
+		miaList = new HashMap<Agent,Integer>();
+		isReady = false;
+	}
+	
+	/**
+	 * The general algorithm here is as follows:
+	 *
+	 * 1. get opinions
+	 * 2. if variance is high (defined)
+	 * 3. then begin clustering
+	 * 4. if clusters are found, build a tree to clusters to identify salient features
+	 * 5. use tree to classify owner trustor
+	 * 6. return only agents from the resulting class.
+	 */
+	public Map<Agent, List<Agent>> filterRecommenders(Agent self, List<Agent> candidates, List<Agent> recs) 
+	{		
+		// only recompute if we are in the learning interval - otherwise return what we have already
+		// WARNING - this could result in querying agents that are no longer in the system if we allow
+		// for the possibility that trustors could leave, which at the moment we don't.
+		
+		// in any event, add the examples to our training data/memory
+		// worst this can get is candidates x recommenders (everyone has an opinion)
+		addToMemory(candidates,recs);
+		
+		// copy of list so we can check who we have to produce sets for
+		List<Agent> checkList = new ArrayList<Agent>(candidates);
+		
+		// our result set that we will add to
+		Map<Agent,List<Agent>> recommendersForAgents = new HashMap<Agent,List<Agent>>();
+		
+		// if we are within the learning interval use the cache
+		if(learningInterval-- > 0)
+		{
+			// if the learner hasn't been built yet, bypass, but if it has, use the cache
+			if(!isReady) 
+				return new DefaultFilter().filterRecommenders(self, candidates, recs);
+			
+			// if the cache has the sets for the candidates we want, just add them from the cache
+			for(Agent a : candidates)
+			{
+				if(cache.containsKey(a))
+				{
+					recommendersForAgents.put(a, cache.get(a));
+					// remove agent from the candidate set
+					// this way, if the cache has all canidates, no
+					// learning will be done
+					// also, this way, we restrict the learning only
+					// to the agents we don't know (within learning interval)
+					checkList.remove(a);
+				}
+			}
+		} else {
+			// reset LI
+			checkList = candidates;
+			learningInterval = 10;
+		}
+		
+		// for each candidate not in cache we're going to come up with a subset of recommenders
+		// by now we should just be learning agents that the cache doesn't have,
+		// unless it's learning time, in which case it all gets done
+		for(Agent a : checkList)
+		{
+			// add results to resulting map
+			List<Agent> recList = new ArrayList<Agent>();
+			
+			// 1. do the opinion query - this is now handled by the memory update
+			// function 'addToMemory(), and is already updated by this point
+			// now we simply retrieve what we have from memory, opinion query already done
+			Map<Agent,Opinion> opinions = memory.get(a);
+
+			// 2. get the variance
+			// use the probability expectation value
+			StandardDeviation sd = new StandardDeviation();
+			double[] pexps = new double[opinions.size()];
+			int i=0;
+			for(Opinion op : opinions.values())
+				pexps[i++] = op.getExpectationValue();
+			double var = sd.evaluate(pexps);
+			// proceed if var > threshold - heuristic
+			if(var > threshold)
+			{
+				// ok ... so pull out the clusterer and train it
+				// two stage learner does everything by itself out of the box
+				// we are using it in a 'single pass' kind of way so we will be resetting
+				// it for each agent, while maintaining a growing set of training data
+				// just hope this is better than maintaining a huge heap of models -
+				// that's the space/time tradeoff I think...
+				learner.train(opinions);
+				int myCluster;
+				// now classify ourselves
+				if(learner.isReady()) 
+				{
+					// get our own cluster
+					myCluster = learner.getClusterForAgent(self);
+					//System.out.println("My cluster ="+myCluster);
+
+					// get the labelled agents from the clusterer
+					Map<Agent,Integer> labelledAgents = learner.getClusterer().getLabelledAgents();
+					//int incSize = 0;					
+					// exclude recommenders who are not in the same cluster as us
+					for(Entry<Agent, Integer> labelledAgent : labelledAgents.entrySet())
+					{
+						//System.out.println(labelledAgent.getKey().getId() + ":" + labelledAgent.getValue());
+						// all agents in the same cluster as us should be added
+						// also, only return agents that were in the original list, otherwise we
+						// are bypassing the AHT restrictions
+						if(labelledAgent.getValue().equals(myCluster) && recs.contains(labelledAgent.getKey())
+								&& !labelledAgent.getKey().equals(trustor))
+						{
+							//System.out.println("Agent " + labelledAgent.getKey() + " is in agent " + trustor.getId() + "'s group ("+ labelledAgent.getValue());
+							recList.add(labelledAgent.getKey());
+							//incSize++;
+						}
+					}
+					//int excludedAgents = recs.size() - incSize;
+					//System.out.println("No. excluded agents:" + excludedAgents + " of " + recs.size());
+				}
+			} else {
+				// if the variance is not sufficient to indicate clusters, just return
+				// all the recommenders (bypass)
+				recList = recs;
+			}
+//			System.out.print(self.getProfile().getId() + " vs " + a.getProfile().getId() + ":");
+//			for(Agent r : recList)
+//				System.out.print(r.getProfile().getId() + ", ");
+//			System.out.print("\n");
+
+			recommendersForAgents.put(a, recList);
+		}
+		isReady = true;
+		// By -adding- all the new results to the cache, instead of setting the cache
+		// to -be- the new results, we're using the cache as a memory to get around the
+		// problem of only having a few data points in the ad hoc team condition
+		
+		cache.putAll(recommendersForAgents);
+		return recommendersForAgents;
+	}
+	
+	/**
+	 * Add a new set of opinions about agents to filter's 'memory'
+	 * -at the moment, the filter never forgets.
+	 * @param candidates
+	 * @param recs
+	 */
+	private void addToMemory(List<Agent> candidates, List<Agent> recs)
+	{
+		for(Agent a : candidates)
+		{
+			// if we've never seen this candidate before, initialise memory for it
+			if(!memory.containsKey(a))
+				memory.put(a, new HashMap<Agent,Opinion>());
+			Map<Agent,Opinion> opinions = memory.get(a);
+
+			// 1. do the opinion query
+			// for each recommender, put its opinion in the map for the current candidate
+			for(Agent r : recs)
+				opinions.put(r,r.opinionQuery(a));
+			memory.put(a, opinions);	
+		}
+		
+		Set<Agent> knownAgents = new HashSet<Agent>(memory.keySet());
+		
+		// reduce time to live of agents in memory who weren't seen this time
+		for(Agent a : knownAgents)
+		{
+			if(!candidates.contains(a))
+			{
+				int ttl = miaList.get(a);
+				// if agents is presumed to be gone, remove from memory
+				if(ttl <= 0)
+				{
+					miaList.remove(a);
+					memory.remove(a);
+				} else {
+					// otherwise, decrement time to live
+					miaList.put(a, --ttl);
+				}
+			} else {
+				// if the candidate set does contain this agent, it's still 'live'
+				// return timeToLive to normal
+				miaList.put(a, timeToLive);
+			}
+			
+			
+		}
+		
+	}
+	
+	// GETTERS/SETTERS
+	public Agent getTrustor() {
+		return trustor;
+	}
+
+	public void setTrustor(Agent trustor) {
+		this.trustor = trustor;
+	}
+
+	/**
+	 * @param noClusters the noClusters to set
+	 */
+	public void setNoClusters(int noClusters) {
+		this.noClusters = noClusters;
+	}
+
+	/**
+	 * @return the noClusters
+	 */
+	public int getNoClusters() {
+		return noClusters;
+	}
+
+	/**
+	 * @param learningInterval the learningInterval to set
+	 */
+	public void setLearningInterval(int learningInterval) {
+		this.learningInterval = learningInterval;
+	}
+
+	/**
+	 * @return the learningInterval
+	 */
+	public int getLearningInterval() {
+		return learningInterval;
+	}
+
+	public Learner getLearner()
+	{
+		return learner;
+	}
+
+	public void visualise() {
+		learner.getClusterer().visualise();
+	}
+	
+	public String toString()
+	{
+		StringBuffer out = new StringBuffer();
+		out.append("Filter for agent " + trustor.getId() + "\n");
+		out.append("Cache size: " + cache.size() + "\n");
+		out.append("Memory size: " + memory.size() + "\n");
+		out.append(memory.toString());
+		return out.toString();
+	}
+
+}

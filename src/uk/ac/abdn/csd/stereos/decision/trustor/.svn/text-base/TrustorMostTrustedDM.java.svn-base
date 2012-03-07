@@ -1,0 +1,54 @@
+package uk.ac.abdn.csd.stereos.decision.trustor;
+
+import java.util.Map;
+import java.util.Map.Entry;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+
+/**
+ * A decision model which returns the most trusted agent, regardless of the risks and controls.
+ *
+ * @author cburnett
+ *
+ */
+public class TrustorMostTrustedDM extends TrustorDecisionModel {
+
+	/**
+	 * Select the most trusted agent
+	 */
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> agents, double uSucc, double uFail, double uAbstain, double monitoringCost) {
+		
+		Agent bestAgent = null;
+		double bestRating = 0.0;
+		// Work which of the known agents is the best
+		// i.e. choose the agent with the highest probability expectation value
+		for(Entry<Agent, Double> a : agents.entrySet())
+		{
+			double thisRating = a.getValue();
+			
+			// If this agent is the best we have seen so far, store it
+			if(thisRating > bestRating)
+			{
+				bestRating = thisRating;
+				// note this agent as the best agent
+				bestAgent = a.getKey();
+			}
+		}
+		
+		// create a simple contract with no meaning, just containing the selected agent
+		// pay him whatever he wants
+		if(bestAgent==null) return null;
+		
+		return new Delegation(owner, bestAgent, bestAgent.getAskingPrice(), bestAgent.getAskingPrice(), 0, Delegation.DELEGATION_MOST_TRUSTED);
+	}
+
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> unconditionalOpinions,
+			Map<Agent, Map<EffortLevel, Double>> conditionalOpinions,
+			double uSucc, double uFail, double uAbs, double monitoringCost) {
+		return selectAgent(unconditionalOpinions,uSucc,uFail,uAbs,monitoringCost);
+	}
+}

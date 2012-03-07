@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/evaluators
+END
+PerformanceEvaluator.java
+K 25
+svn:wc:ra_dav:version-url
+V 102
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/evaluators/PerformanceEvaluator.java
+END
+DefaultEvaluator.java
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/evaluators/DefaultEvaluator.java
+END
+BiasedEvaluator.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/evaluators/BiasedEvaluator.java
+END

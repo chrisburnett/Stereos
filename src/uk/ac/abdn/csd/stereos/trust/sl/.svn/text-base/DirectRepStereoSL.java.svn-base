@@ -1,0 +1,99 @@
+package uk.ac.abdn.csd.stereos.trust.sl;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.exceptions.InvalidParametersException;
+import uk.ac.abdn.csd.stereos.util.Pair;
+import uk.ac.abdn.csd.stereos.util.Utilities;
+
+/**
+ * This class implements a trust model using direct, reputational and stereotypical
+ * components, and using subjective logic as a computational mechanism.
+ * 
+ * @author Chris Burnett
+ *
+ */
+public class DirectRepStereoSL extends DirectStereoSL {
+	
+	/**
+	 * Default constructor.
+	 * @param temperature
+	 * @param halfLife
+	 * @param learningInterval
+	 * @param clusters
+	 * @throws InvalidParametersException
+	 */
+	public DirectRepStereoSL(double temperature, int halfLife,
+			int learningInterval, int clusters)
+			throws InvalidParametersException {
+		super(temperature, halfLife, learningInterval, clusters);
+	}
+	
+	@Override
+	public Map<Agent,Double> evaluate(List<Agent> agents, Map<Agent,List<Agent>> recommenders, int time) 
+	{
+		Map<Agent,Double> results = new HashMap<Agent,Double>();
+		// update the base rate cache as required
+		updateBaseRates(agents);
+		
+		// Work which of the known agents is the best
+		// i.e. choose the agent with the highest probability expectation value
+		for(Agent a : agents)
+		{
+			// calculate a reputation value for this agent by quering available
+			// recommendation providers for their combined evidence tuples
+			Pair<Double,Double> repEvidence = Utilities.aggregateReputation(recommenders.get(a),a,time);
+			double totalPositives = repEvidence.a;
+			double totalNegatives = repEvidence.b;
+			
+			// if we have direct evidence about this agent include it
+			if(evidence.containsKey(a))
+			{
+				// get the rating, taking into account reputation
+				Pair<Double,Double> dirEvidence = evidence.get(a);
+				// add it to our total evidence tuple
+				totalPositives += dirEvidence.a;
+				totalNegatives += dirEvidence.b;
+			}	
+			
+			// if we have an opinion already, get it
+			// bring together direct and reputational evidence
+			Opinion op;
+			if(opinions.containsKey(a))
+			{
+				op = opinions.get(a);
+				op.setPositives(totalPositives);
+				op.setNegatives(totalNegatives);
+			}
+			else 
+			{
+				op = new Opinion(totalPositives,totalNegatives);
+				op.setBaseRate(defaultPrior);
+				opinions.put(a, op);
+			}
+
+			// set the base rate from the stereotype, if we have one
+			// otherwise, opinion default (ambig. aversion) will be in effect
+			if(stereotypeRatingCache.containsKey(a))
+			{
+				op.setBaseRate(stereotypeRatingCache.get(a));
+			} else {
+				op.setBaseRate(defaultPrior);
+			}
+						
+			// calculate a reputation rating from probability expectation
+			double rating = op.getExpectationValue();
+			ratings.put(a, rating);
+			
+			// populate result set
+			results.put(a, rating);
+		}
+		
+		// update the mean rating
+		meanRating = Utilities.calculatePopulationMeanPerformance(ratings);
+		return results;
+	}
+}

@@ -1,0 +1,540 @@
+package uk.ac.abdn.csd.stereos.agents;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Map.Entry;
+
+import uk.ac.abdn.csd.stereos.Experiment;
+import uk.ac.abdn.csd.stereos.agents.evaluators.DefaultEvaluator;
+import uk.ac.abdn.csd.stereos.agents.evaluators.PerformanceEvaluator;
+import uk.ac.abdn.csd.stereos.decision.trustee.TrusteeDecisionModel;
+import uk.ac.abdn.csd.stereos.decision.trustor.TrustorDecisionModel;
+import uk.ac.abdn.csd.stereos.reputation.DefaultFilter;
+import uk.ac.abdn.csd.stereos.reputation.ReputationFilter;
+import uk.ac.abdn.csd.stereos.trust.TrustModel;
+import uk.ac.abdn.csd.stereos.trust.sl.Opinion;
+import uk.ac.abdn.csd.stereos.util.Pair;
+
+/**
+ * This class represents an agent participating in the experiment.
+ * At any particular time step, an agent can be either a trustee or
+ * a trustor, but never both.
+ * 
+ * @author Chris Burnett
+ *
+ */
+public class Agent {
+	
+	// Constants for the mode of an agent
+	public static final int TRUSTEE = 0;
+	public static final int TRUSTOR = 1;
+		
+	/**
+	 * This variable determines the role this agent will play at this time step
+	 */
+	private int role;
+	
+	/**
+	 * This variable stores a short identifier for the agent
+	 */
+	private String id;
+	
+	/**
+	 * The trust model this agent will use
+	 */
+	protected TrustModel trustModel;
+	
+	/**
+	 * The decision model the agent will use as a trustor
+	 */
+	protected TrustorDecisionModel trustorDecisionModel;
+	
+	/**
+	 * The decision model to be used when acting as a trustee
+	 */
+	protected TrusteeDecisionModel trusteeDecisionModel;
+	
+	/**
+	 * The performance profile of this agent
+	 */
+	private Profile profile;
+
+	/**
+	 * Feature vector of this agent. Features are represented as strings, or symbols.
+	 * Currently, presence or absence of a feature is indicated by a 1 or 0, respectively
+	 */
+	private Map<String,Integer> featureVector;
+
+	/**
+	 * The performance evaluation function this agent will use to judge the outcomes
+	 * of delegation decisions as either positive or negative
+	 */
+	private PerformanceEvaluator performanceEvaluator;
+
+	/**
+	 * This filter this agent will use to filter out biased or deceptive recommenders
+	 */
+	private ReputationFilter filter;
+	
+	/**
+	 * Reference to the experiment this agent is participating in, so the
+	 * agent can request sets of candidates.
+	 */
+	protected Experiment experiment;
+
+	/**
+	 * Store the average outcomes of the agent at each time point
+	 * and maintain the total for the purposes of calculating the average
+	 */
+	private List<Double> avgResult;
+	private double totalResult;
+	
+	/**
+	 * Utility of the agent at each time step
+	 * This simple variable records the agent's utility throughout the experiment
+	 * whether they be trustee or trustor
+	 */
+	private double utility;
+	
+	private List<Double> utilityHistory;
+	
+	/**
+	 * Asking price of the agent for the (default) task
+	 */
+	private double askingPrice;
+	
+	/**
+	 * Create a new agent with given profile and trust model. This constructor will
+	 * create an agent with a default (threshold) performance evaluation function
+	 * with a threshold of 0.5.
+	 * 
+	 * @param id short id for this agent
+	 * @param trustModel trust model used by this agent
+ 	 * @param todm the decision model used
+	 * @param profile the performance profile of this agent
+	 * @param featureVector the complete feature vector of this agent (including noise features)
+	 * @param a reference to the experiment this agent is part of
+	 */
+	public Agent(String id, TrustModel tm, TrustorDecisionModel todm, TrusteeDecisionModel tedm,
+			Profile profile, Map<String,Integer> featureVector, Experiment experiment) {
+		super();
+		this.id = id;
+		this.trustModel = tm;
+		this.trustorDecisionModel = todm;
+		this.trusteeDecisionModel = tedm;
+		this.experiment = experiment;
+		this.profile = profile;
+		this.featureVector = featureVector;
+		// If no PE function is specified, create the default evaluator with a 
+		// threshold of 0.5
+		this.performanceEvaluator = new DefaultEvaluator(0.5);
+		this.filter = new DefaultFilter();
+		this.avgResult = new ArrayList<Double>();
+		this.utilityHistory = new ArrayList<Double>();
+		this.totalResult = 0;
+		
+		// init utility history to start at 0
+		utilityHistory.add(0.0);
+		utility = 0;
+		
+		// set our self as owner
+		todm.setOwner(this);
+		
+		// tell trust model about the ambiguity aversion of this agent
+		tm.setDefaultPrior(this.profile.getDefaultAmbiguityAversion());
+		
+		// set our asking price to that specified as default by the profile
+		askingPrice = this.profile.getDefaultAskingPrice();
+	}
+	
+	/**
+	 * Create a new agent with the specified parameters, and given performance evaluation function
+	 * 
+	 * @param id short id for this agent
+	 * @param tm trust model used by this agent
+	 * @param dm the decision model used
+	 * @param pe performance evaluation function for this agent
+	 * @param p profile the performance profile of this agent
+	 * @param featureVector the complete feature vector of this agent (including noise features)
+	 * @param e a reference to the experiment this agent is part of
+	 */
+	public Agent(String id, TrustModel tm, TrustorDecisionModel todm, TrusteeDecisionModel tedm, PerformanceEvaluator pe, Profile p, Map<String,Integer> featureVector, Experiment e)
+	{
+		super();
+		this.id = id;
+		this.trustModel = tm;
+		this.trustorDecisionModel = todm;
+		this.trusteeDecisionModel = tedm;
+		this.experiment = e;
+		this.profile = p;
+		this.featureVector = featureVector;
+		this.performanceEvaluator = pe;	
+		this.avgResult = new ArrayList<Double>();
+		this.utilityHistory = new ArrayList<Double>();
+		this.totalResult = 0;
+		this.filter = new DefaultFilter();
+
+		// set the default ambiguity aversion
+		this.trustModel.setDefaultPrior(p.getDefaultAmbiguityAversion());
+		
+		// init utility history to start at 0
+		utilityHistory.add(0.0);
+		utility = 0;
+		
+		// set our self as owner
+		todm.setOwner(this);
+		
+		// tell trust model about the ambiguity aversion of this agent
+		tm.setDefaultPrior(this.profile.getDefaultAmbiguityAversion());
+		
+		// set our asking price to that specified as default by the profile
+		askingPrice = this.profile.getDefaultAskingPrice();
+	}
+	
+	
+
+	/**
+	 * Get the role this agent will be enacting
+	 * @return the role as an integer
+	 */
+	public int getRole() {
+		return role;
+	}
+
+	/**
+	 * Set the role this agent will be enacting
+	 * @param role
+	 */
+	public void setRole(int role) {
+		this.role = role;
+	}
+
+	/**
+	 * Get the ID of this agent
+	 * @return the ID string
+	 */
+	public String getId() {
+		return id;
+	}
+
+	/**
+	 * Set the ID of this agent
+	 * @param id the ID string to set
+	 */
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public Profile getProfile() {
+		return profile;
+	}
+
+	public void setProfile(Profile profile) {
+		this.profile = profile;
+	}
+
+	public Map<String,Integer> getFeatures() {
+		return featureVector;
+	}
+
+	public void setFeatures(Map<String,Integer> features) {
+		this.featureVector = features;
+	}
+
+	/**
+	 * Cause this agent to perform its task delegation sequence
+	 * @param uAbstain 
+	 * @param monitoringCost 
+	 * 
+	 * @param timeStep the current time step the simulation is at. This is so that the
+	 * agent can know for sure what the current time step is. Although we are currently
+	 * invoking all delegating agents at every time step, it may be the case in the future 
+	 * that there is a probability of delegation at each time step, and so the agent
+	 * cannot rely on a simple counter here to know what the time step is.
+	 * 
+	 * Returns a reference to the chosen agents.
+	 */
+	public Agent delegate(double uSucc, double uFail, double uAbstain, double monitoringCost, int timeStep) {
+		// uSucc and uFail are *global* task success/fail utilities
+		// Ask the experiment control for the list of candidates	
+		List<Agent> candidates = experiment.getDelegationCandidates(this);
+		// Ask the experiment control for a list of recommenders
+		List<Agent> recommenders = experiment.getReputationCandidates(this);
+		// filter recommenders for stereotypical bias - we may contact different recommenders for different agents
+		Map<Agent,List<Agent>> filteredRecommenders = filter.filterRecommenders(this, candidates, recommenders);
+		
+		// --- MAIN AGENT TRUST PROCESS ---
+		// Use trust model to evaluate them - unconditionally
+		Map<Agent,Double> unconditionalOpinions = trustModel.evaluate(candidates, filteredRecommenders, timeStep);
+		// then conditionally
+		Map<Agent,Map<EffortLevel,Double>> conditionalOpinions = trustModel.conditionallyEvaluate(candidates, filteredRecommenders, timeStep);
+		// Use decision model to decide - decision mode produces a 'contract' (or incentive structure, whatever)
+		Delegation contract = trustorDecisionModel.selectAgent(unconditionalOpinions, conditionalOpinions, uSucc, uFail, uAbstain, monitoringCost);
+		// --------------------------------
+		if(contract != null) {    // if agent opted to delegate at all
+			double observation;
+			double evaluation;
+			Agent trustee = contract.getTrustee();
+			if(trustee != null) {
+				// check to see agent will accept and invoke
+				if(trustee.propose(contract))
+					observation = trustee.perform(contract);
+				else {
+					// otherwise delegation failed - this shouldn't generally happen because
+					// trustee knows how to set contracts, but might get it wrong
+					this.incUtility(uAbstain);
+					return null;
+				}
+				evaluation = this.performanceEvaluator.evaluate(trustee, observation);
+				// transfer payment from trustor to trustee
+				// unless self delegation!
+				if(this != trustee)
+					trustee.incUtility(trustee.getAskingPrice());
+				
+				if(evaluation == 1)
+					this.incUtility(uSucc-trustee.getAskingPrice());
+				else
+					this.incUtility(uFail-trustee.getAskingPrice());
+				
+				// record the experience in the trust model's experience base
+				// get the observed effort level from the contract
+				EffortLevel observedEffort = contract.getTrusteeEffort();
+				Experience thisExperience = new Experience(this,trustee,observedEffort,observation,evaluation,this.performanceEvaluator,timeStep);
+				trustModel.addExperience(thisExperience);
+				updateAvgResult(evaluation,trustModel.getExperienceBase().size());
+				// submit the new rating to the centralised reputation store
+				return trustee;
+			} else {
+				System.out.println("ERROR - no trustees were returned");
+				return null;
+			}
+		} else {
+			// in the case agent opts to abstain, do not delegate but deduct the abstain cost
+			// from the agent's utility
+			this.incUtility(uAbstain);
+			// return our'selves' to indicate abstainance/self-delegation
+			return this;
+		}
+		//-----------------------------------------------------
+	}
+
+	/**
+	 * Update the agent's average interaction outcome
+	 * @param outcome
+	 * @param timeStep
+	 */
+	private void updateAvgResult(double outcome, int expCount) {
+		totalResult += outcome;
+		avgResult.add(totalResult/expCount);
+	}
+	
+	/**
+	 * Return the agent's average utility after a given number of experiences (time)
+	 * @param interaction
+	 * @return the average utility by this interaction, -1 if agent does not the requested interaction
+	 */
+	public double getAvgResult(int interaction) {
+		if(interaction >= avgResult.size())
+			return -1;
+		return avgResult.get(interaction);
+	}
+	
+	public List<Double> getAvgResults()
+	{
+		return this.avgResult;
+	}
+
+	/**
+	 * Check whether the agent will accept this contract
+	 * @param del
+	 * @return
+	 */
+	public boolean propose(Delegation del)
+	{
+		// calcualte EU of contract
+		// true if accpet, false otherwise
+		if(this.trusteeDecisionModel.selectEffort(del, askingPrice, profile) == null)
+			return false;
+		else
+			return true;
+	}
+	
+	/**
+	 * Perform a virtual task on behalf of a delegating agent and return
+	 * the result
+	 * @return a double representing the outcome (task performance)
+	 */
+	public double perform() {
+		// when asked to perform without an incentive structure, we select the default level of effort from the profile
+		return profile.getDefaultPerformanceValue();
+	}
+	
+	/**
+	 * Perform a virtual task, given a particular incentive structure (contract)
+	 * @param del
+	 * @return a double representing the outcome (task performance)
+	 * or null representing refusal
+	 */
+	public double perform(Delegation del)
+	{
+		EffortLevel selectedEffort = trusteeDecisionModel.selectEffort(del, askingPrice, profile);
+		return profile.getPerformanceValue(selectedEffort);
+	}
+
+	/**
+	 * Get this agent's trust model
+	 * @return the trust model
+	 */
+	public TrustModel getTrustModel() {
+		return trustModel;
+	}
+	
+	/**
+	 * Return a rating when asked, for use in reputational models.
+	 * @param a an agent 
+	 * @return a calculated rating for that agent
+	 */
+	public double query(Agent a)
+	{
+		// get the cached calculated rating from the trust model
+		return trustModel.query(a);
+	}
+	
+	/**
+	 * Return a tuple of positive and negative evidence when asked.
+	 * 
+	 * @param a the target agent being evaluated
+	 * @return an evidence tuple, or null if this feature is not supported
+	 * by the agent's trust model
+	 */
+	public Pair<Double,Double> evidenceQuery(Agent a)
+	{
+		return trustModel.evidenceQuery(a);
+	}
+	
+	/**
+	 * Return an SL opinion about the specified agent
+	 * @param a agent to query for
+	 * @return an SL opinion, or null if the agent's model is not SL based
+	 */
+	public Opinion opinionQuery(Agent a)
+	{
+		return trustModel.opinionQuery(a);
+	}
+
+	/**
+	 * Return a short string describing this agent
+	 */
+	public String toString()
+	{
+		// We use A to signify the trustor, and B the trustee.
+		// This is consistent with the usual "Alice and Bob" convention for delegation relationships :)
+		String roleName = this.role == Agent.TRUSTOR ? "A" : "B";
+		return id + ":" + roleName + ":" + profile.getId();
+	}
+	
+	/**
+	 * Equals method, which compares agents on the basis of their ID strings
+	 * @param agent to compare
+	 * @return true, if the ID strings match
+	 */
+	public boolean equals(Agent a)
+	{
+		if (this.id.equals(a.id))
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Increment utility at time step by specified amount
+	 */
+	public void incUtility(double amount)
+	{
+		// get the last item in the utility history
+		utility += amount;
+		utilityHistory.add(utility);
+	}
+	
+	/**
+	 * Increment utility at time step by specified amount
+	 */
+	public void decUtility(double amount)
+	{
+		// get the last item in the utility history
+		utility -= amount;
+		utilityHistory.add(utility);
+	}
+	
+	/**
+	 * Get the utility at a given time step
+	 * @param timeStep
+	 * @return
+	 */
+	public List<Double> getUtilityHistory()
+	{
+		return utilityHistory;
+	}
+	
+	/**
+	 * Return a nice string representing the feature vector of this agent
+	 * @return
+	 */
+	public String getFeatureVectorString()
+	{
+		StringBuffer out = new StringBuffer();
+		out.append(getId()+": [");
+		
+		// we need a sorted vector
+		Map<String,Integer> sv = new TreeMap<String,Integer>(featureVector);
+		
+		for(Entry<String,Integer> e : sv.entrySet())
+		{
+			out.append(e.getKey()+"=");
+			if(e.getValue() == null)
+				out.append("_");
+			else out.append(e.getValue());
+			out.append(",");
+		}
+		return out.toString();
+	}
+
+	public PerformanceEvaluator getPerformanceEvaluator() {
+		return performanceEvaluator;
+	}
+
+	public void setPerformanceEvaluator(PerformanceEvaluator performanceEvaluator) {
+		this.performanceEvaluator = performanceEvaluator;
+	}
+
+	public ReputationFilter getFilter() {
+		return filter;
+	}
+
+	public void setFilter(ReputationFilter rFilter) {
+		this.filter = rFilter;
+	}
+
+	/**
+	 * @param askingPrice the askingPrice to set
+	 */
+	public void setAskingPrice(double askingPrice) {
+		this.askingPrice = askingPrice;
+	}
+
+	/**
+	 * @return the askingPrice
+	 */
+	public double getAskingPrice() {
+		return askingPrice;
+	}
+	
+	public Map<String, EffortLevel> getEffortCosts()
+	{
+		return this.profile.getEfforts();
+	}
+
+
+}

@@ -1,0 +1,45 @@
+# Experimental setup file.
+# experimental mode: normal, nocorr, crash, mix, amnesia
+mode = normal
+# number of overall repititions of the experiment to run
+runs = 1
+# The name of the profile 'profile' to use :)
+profiles = globalpop
+# The number of teams that will exist at any point in time
+teamCount = 10
+# The size of each team
+teamSize = 20
+# Number of trustor agents in the society
+trustorCount = 10
+# Number of cycles to run
+timeSteps = 500
+# Lifetime of teams, in cycles
+teamLifeTime = 5
+# Join/leave probability, per round for agents
+agentReplaceProb = 0.0
+# replace probability for trustors
+trustorReplaceProb = 0.00
+# interaction probability per round
+interactProb = 0.8
+# comma separated list of experimental conditions to use
+conditions = 6
+# number of 'noise' features to generate
+noiseFeatureCount = 0
+# maximum number of features that can be missing
+maxMissingFeatures = 0
+# probability that any feature will be missing
+missingFeatureProb = 0.0
+# temperature parameter for boltzmann exploration
+temperature=0.2
+# Half-life for recency weighting
+halfLife = 50
+# maximum number of agents to seek and query for reputational opinions (=trustor count)
+maxQueries = 20
+# number of experiences between stereotype learning updates (will need tweaked;)
+learningInterval = 10
+# number of clusters to create in the opinion/rating space
+clusterCount = 3
+# payoff for trustor in case of success
+successPayoff = 100
+# payoff if the agent does not delegate
+failToDelegatePayoff = 50

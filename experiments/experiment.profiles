@@ -1,0 +1,11 @@
+# Profile file for the test experiment
+# The format is ID,TRUSTEE-COUNT,TRUSTOR-COUNT,DEFAULT-ASK-PRICE,DEFAULT-AMBIGUITY-AVERSION:[FEATURES]:[EFFORT_LEVELS]
+# A feature is a tuple consisting of an identifier and a real value in [0,1] 
+# giving a probability of this profile possessing this feature
+# An effort level consists of an identifier, a mean, st. dev and cost to the agent
+# These profiles are each indicated by the presence of one feature and absence of the others.
+p1,100,10,2,0.5:[(f1,1.0),(f2,0.0),(f3,0.0),(f4,0.0),(f5,0.0),(f6,1.0)]:[(e1,0.9,0.05,2)]
+p2,100,10,2,0.5:[(f1,0.0),(f2,1.0),(f3,0.0),(f4,1.0),(f5,0.0),(f6,0.0)]:[(e1,0.6,0.15,2)]
+p3,100,10,2,0.5:[(f1,0.0),(f2,0.0),(f3,1.0),(f4,1.0),(f5,0.0),(f6,0.0)]:[(e1,0.4,0.15,2)]
+p4,100,10,2,0.5:[(f1,0.0),(f2,1.0),(f3,1.0),(f4,0.0),(f5,1.0),(f6,0.0)]:[(e1,0.3,0.10,2)]
+p5,100,10,2,0.5:[(f1,0.0),(f2,1.0),(f3,1.0),(f4,0.0),(f5,0.0),(f6,1.0)]:[(e1,0.0,1.00,2)]

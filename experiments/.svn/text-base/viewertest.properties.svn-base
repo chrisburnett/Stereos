@@ -1,0 +1,43 @@
+# Experimental setup file.
+# experimental mode: simple(0) or decision theoretic(1)
+mode = 0
+# number of overall runs to produce
+runs = 1
+# The name of the profile 'profile' to use :)
+profiles = viewertest
+# The number of teams that will exist at any point in time
+teamCount = 4
+# The size of each team
+teamSize = 10
+# The number of different tasks that will be created
+#taskCount = 1
+# Number of trustor agents in the society (was 10)
+trustorCount = 5
+# Number of cycles to run the experiment for
+timeSteps = 500
+# Lifetime of teams, in cycles
+teamLifeTime = 5
+# Join/leave probability, per round for agents
+agentReplaceProb = 0.0
+# replace probability for trustors
+trustorReplaceProb = 0.00
+# Interaction probability per round
+interactProb = 0.8
+# Comma separated list of experimental conditions to use
+conditions = 3
+# Number of 'noise' features to generate
+noiseFeatureCount = 6
+# Temperature parameter for boltzmann exploration
+temperature=0.2
+# Half-life for recency weighting
+halfLife = 50
+# Maximum number of agents to seek and query for reputational opinions (=trustor count)
+maxQueries = 20
+# Number of experiences between stereotype learning updates (will need tweaked;)
+learningInterval = 10
+# number of clusters to create in the opinion/rating space
+clusterCount = 3
+# payoff for trustor in case of success
+successPayoff = 100
+# payoff if the agent does not delegate
+failToDelegatePayoff = 50

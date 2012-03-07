@@ -1,0 +1,86 @@
+package uk.ac.abdn.csd.stereos.decision.trustor;
+
+import java.util.Map;
+import java.util.Map.Entry;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+
+/**
+ * This class represents a basic implementation of a trustor's decision model, not taking into
+ * account monitoring or reputational incentive.
+ * 
+ * @author cburnett
+ *
+ */
+public class TrustorDTBasicDM extends TrustorDecisionModel {
+
+	@Override
+	/**
+	 * The result of this method will be a delegation, or 'proposal' object to
+	 * be sent to the selected agent. If the agent decides not to delegate, null will
+	 * be returned instead
+	 * 
+	 * At the moment, risk neutral
+	 * 
+	 * @returns a delegation object, or null if agent decides not to delegate
+	 */
+	public Delegation selectAgent(Map<Agent, Double> agents, double uSucc, double uFail, double uAbs, double monitoringCost) 
+	{
+		// needs to generate a 'contract'
+		// fundamental principle is that the trustor acts in a way to maximise EU
+		// so for each agent we calculate this
+		
+		Agent bestAgent = null;
+		double bestEU = 0.0;
+		// Work which of the known agents is the best
+		// i.e. choose the agent with the highest probability expectation value
+		
+		// the abstainance EU is the same for all agents
+		// we assume here that, in the case of abstainance, the agent gets
+		// a definite payoff. However, this could easily be probabilistic; if abstain means
+		// to do the task by onesself, this could be subject to self-trust.
+		//double euAbstain = uAbs;
+		
+		for(Entry<Agent, Double> a : agents.entrySet())
+		{
+			Agent agent = a.getKey();
+			double rating = a.getValue();
+			
+			// we are assuming this is an unavoidable cost to invoke the agent
+			double askingPrice = agent.getAskingPrice();
+			double euSuccess = rating * (uSucc - askingPrice);
+			double euFailure = 1-rating * (uFail - askingPrice);
+			double agentEU = euSuccess + euFailure;
+			
+			// if this agent offers the best EU so far, set it to be the best
+			if(agentEU > bestEU) 
+			{
+				bestAgent = agent;
+				bestEU = agentEU;
+			}
+		}
+		
+		//System.out.println(bestEU);
+		
+		// if the best available agent is a worse bet than doing it ourselves, return a contract for ourselves
+		// by using the <= relation, we're making the trustor a bit risk averse - if the EUs are the same,
+		// the trustor will still prefer to do it alone.
+		
+		// if no it's better to abstain, delegate to ourselves
+		if(bestEU < uAbs)
+			return new Delegation(owner, owner, uAbs, uAbs,uAbs,Delegation.DELEGATION_SIMPLE);
+		// create a simple contract, just containing the selected agent
+		return new Delegation(owner, bestAgent, bestAgent.getAskingPrice(), bestAgent.getAskingPrice(),bestEU,Delegation.DELEGATION_SIMPLE);
+	}
+
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> unconditionalOpinions,
+			Map<Agent, Map<EffortLevel, Double>> conditionalOpinions,
+			double uSucc, double uFail, double uAbs, double monitoringCost) {
+		// Just pass on to the simple method - DT trust model doesn't use the conditional ratings
+		return selectAgent(unconditionalOpinions,uSucc,uFail,uAbs,monitoringCost);
+	}
+
+}

@@ -1,0 +1,59 @@
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/Astice/!svn/ver/8/stereos/src/uk/ac/abdn/csd/stereos/util/reporters
+END
+ExampleOpinionsReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/8/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/ExampleOpinionsReporter.java
+END
+GlobalAverageReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 100
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/GlobalAverageReporter.java
+END
+ExampleRMSEReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/8/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/ExampleRMSEReporter.java
+END
+GlobalOpinionsReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/GlobalOpinionsReporter.java
+END
+ExampleAverageReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/ExampleAverageReporter.java
+END
+ProfileUtilityReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/ProfileUtilityReporter.java
+END
+TrustorUtilityReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/TrustorUtilityReporter.java
+END
+GlobalRMSEReporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/Astice/!svn/ver/8/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/GlobalRMSEReporter.java
+END
+Reporter.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/Astice/!svn/ver/8/stereos/src/uk/ac/abdn/csd/stereos/util/reporters/Reporter.java
+END

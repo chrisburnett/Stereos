@@ -1,0 +1,264 @@
+package uk.ac.abdn.csd.stereos.agents;
+
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * This class represents an incentive structure, and all the necessary flags to represent
+ * different outcomes. Note that this assumes (as does the whole system) only one possible task.
+ * 
+ * @author cburnett
+ *
+ */
+public class Delegation {
+
+	// the trustor who has proposed the contract
+	private Agent trustor;
+	// the trustee to whome the contract is proposed
+	private Agent trustee;
+	
+	// flags for success and failure
+	public static final int OUTCOME_SUCCESS = 1;
+	public static final int OUTCOME_FAILURE = 0;
+	
+	// flags for delegation type stamps
+	public static final int DELEGATION_MOST_TRUSTED = 100;
+	public static final int DELEGATION_SIMPLE = 101;
+	public static final int DELEGATION_UNMONITORED = 102;
+	public static final int DELEGATION_SELF = 110;
+	public static final int DELEGATION_MONITORED = 103;
+	
+	// payoff structures in case of success or failure
+	private Map<String,Double> successPayoffs;
+	private Map<String,Double> failurePayoffs;
+	
+	// reputational incentives
+	private double riNeg;
+	private double riPos;
+	
+	private int type;
+	
+	// is delegation monitored?
+	private boolean isMonitored;
+	
+	// is RI proposed?
+	private boolean isRi;
+	
+	// the expected performance level
+	// i.e. trustor considers performance above this as success, and below as fail
+	// defaults to 0.5
+	private double performanceThreshold = 0.5;
+	
+	private EffortLevel trusteeEffort;
+	
+	/**
+	 * The EU the trustor expects to get from the contract
+	 * This allows alternative delegations to be compared by the trustor.
+	 * It's not intended to be viewed by the trustee...
+	 */
+	private double trustorEU;
+
+
+	public double getTrustorEU() {
+		return trustorEU;
+	}
+
+	public void setTrustorEU(double trustorEU) {
+		this.trustorEU = trustorEU;
+	}
+
+	/**
+	 * Unmonitored delegation constructor
+	 * @param successPayoff
+	 * @param failurePayoff
+	 */
+	public Delegation(Agent trustor, Agent trustee, double successPayoff, double failurePayoff, double trustorEU, int type)
+	{
+		successPayoffs = new HashMap<String,Double>();
+		failurePayoffs = new HashMap<String,Double>();
+
+		// * represents all effort levels, since we aren't being monititored
+		successPayoffs.put("*", successPayoff);
+		failurePayoffs.put("*", failurePayoff);
+		isRi = false;
+		isMonitored = false;
+		riNeg = 0;
+		riPos = 0;
+		
+		this.trustorEU = trustorEU;
+		
+		this.trustee = trustee;
+		this.trustor = trustor;
+		
+		this.type = type;
+	}
+	
+	/**
+	 * Monitored delegation constructor - payoff to trustee is conditional on EFFORT
+	 * @param sps success payoff function
+	 * @param fps failure payoff function
+	 */
+	public Delegation(Agent trustor, Agent trustee, Map<String,Double> sps, Map<String,Double> fps, double trustorEU, int type)
+	{
+		successPayoffs = sps;
+		failurePayoffs = fps;
+		isMonitored = true;
+		isRi = false;
+		riNeg = 0;
+		riPos = 0;
+		this.type = type;
+
+	}
+
+	/**
+	 * Reputational incentive constructor
+	 * @param successPayoff
+	 * @param failurePayoff
+	 * @param riP positive reputational incentive
+	 * @param riN negative reputational incentive
+	 */
+	public Delegation(Agent trustor, Agent trustee, double successPayoff, double failurePayoff, double riP, double riN, int type)
+	{
+		successPayoffs.put("*", successPayoff);
+		failurePayoffs.put("*", failurePayoff);
+		riPos = riP;
+		riNeg = riN;
+		isRi = true;
+		isMonitored = false;
+		
+		this.trustee = trustee;
+		this.trustor = trustor;
+		
+		this.type = type;
+
+	}
+	
+	public Agent getTrustor() {
+		return trustor;
+	}
+
+	public void setTrustor(Agent trustor) {
+		this.trustor = trustor;
+	}
+
+	public Agent getTrustee() {
+		return trustee;
+	}
+
+	public void setTrustee(Agent trustee) {
+		this.trustee = trustee;
+	}
+
+	/**
+	 * Return unmonitored success payoff for this delegation
+	 */
+	public double getSuccessPayoff()
+	{
+		return riPos + successPayoffs.get("*");
+	}
+	
+	/**
+	 * Return unmonitored failure payoff for this delegation
+	 */
+	public double getFailurePayoff()
+	{
+		return riNeg + failurePayoffs.get("*");
+	}
+	
+	/**
+	 * Return the conditional payoff in success case
+	 * @param effort
+	 * @return
+	 */
+	public double getSuccessPayoff(String effort)
+	{
+		return riPos + successPayoffs.get(effort);
+	}
+	
+	/**
+	 * Return monitored (conditional) payoff
+	 * @param effort id of effort level
+	 * @return
+	 */
+	public double getFailurePayoff(String effort)
+	{
+		return riNeg + failurePayoffs.get(effort);
+	}
+
+	public double getRiNeg() {
+		return riNeg;
+	}
+
+	public void setRiNeg(double riNeg) {
+		this.riNeg = riNeg;
+	}
+
+	public double getRiPos() {
+		return riPos;
+	}
+
+	public void setRiPos(double riPos) {
+		this.riPos = riPos;
+	}
+
+	public boolean isMonitored() {
+		return isMonitored;
+	}
+
+	public void setMonitored(boolean isMonitored) {
+		this.isMonitored = isMonitored;
+	}
+
+	public boolean isRi() {
+		return isRi;
+	}
+
+	public void setRi(boolean ri) {
+		this.isRi = ri;
+	}
+	
+	public double getPerformanceThreshold() {
+		return performanceThreshold;
+	}
+	
+	public Map<String, Double> getSuccessPayoffs() {
+		return successPayoffs;
+	}
+
+	public void setSuccessPayoffs(Map<String, Double> successPayoffs) {
+		this.successPayoffs = successPayoffs;
+	}
+
+	public Map<String, Double> getFailurePayoffs() {
+		return failurePayoffs;
+	}
+
+	public void setFailurePayoffs(Map<String, Double> failurePayoffs) {
+		this.failurePayoffs = failurePayoffs;
+	}
+
+	public EffortLevel getTrusteeEffort() {
+		return trusteeEffort;
+	}
+
+	public void setTrusteeEffort(EffortLevel trusteeEffort) {
+		this.trusteeEffort = trusteeEffort;
+	}
+
+	public void setPerformanceThreshold(double performanceThreshold) {
+		this.performanceThreshold = performanceThreshold;
+	}
+
+	public int getType() {
+		return this.type;
+	}
+
+	public void setType(int type) {
+		this.type = type;
+	}
+
+	
+	
+	
+}

@@ -1,0 +1,88 @@
+package uk.ac.abdn.csd.stereos.util;
+
+import java.util.Random;
+
+import uk.ac.abdn.csd.stereos.exceptions.InvalidParametersException;
+
+/**
+ * This class implements the Boltzmann exploration strategy.
+ * 
+ * @author Chris Burnett
+ * 
+ */
+public class Boltzmann
+{
+
+	/**
+	 * The temperature parameter
+	 */
+	private double temperature;
+
+	/**
+	 * Random number generator for probabilistic exploration
+	 */
+	private Random random;
+
+	/**
+	 * Create a new Boltzmann decision model.
+	 * 
+	 * @param temperature
+	 * @throws InvalidParametersException
+	 *             if temperature is not between 0 and 1.
+	 */
+	public Boltzmann(double temperature) throws InvalidParametersException
+	{
+		if (temperature > 1 || temperature < 0)
+			throw new InvalidParametersException();
+		this.temperature = temperature;
+		random = new Random();
+
+	}
+
+	/**
+	 * Calculate the Boltzmann exploration decision.
+	 * 
+	 * @param timeStep
+	 * @return 0 to explore, 1 to choose highest ranked agent
+	 */
+	public boolean exploit(int time, double meanRating, double bestRating)
+	{
+		// if there is no best rating, we can only epxlore
+		if (bestRating == 0.0)
+			return false;
+		// Calculate t weight
+		// NOTE: here we're using the size of the experience base instead of
+		// time steps,
+		// since an agent might not interact in every round, this figure
+		// represents
+		// better the agent's perception of 'time'
+		// double t = (temperature/experienceBase.size());
+
+		double t = Math.pow(temperature, time);
+
+		if (t > 0) {
+			double gExploit = Math.exp(bestRating / t);
+			double gExplore = Math.exp(meanRating / t);
+
+			double sum = gExploit + gExplore;
+
+			double pExploit = gExploit / sum;
+			double prob = random.nextDouble();
+
+			// If the values are too small to count as doubles, take this as 0
+			// and end exploration
+			if (gExploit == Double.POSITIVE_INFINITY || gExplore == Double.POSITIVE_INFINITY)
+				return true;
+
+			// Determine whether to exploit or explore
+			if (pExploit <= prob)
+				return true;
+			else
+				return false;
+		} else
+			// in the case that the temperature has reached 0, no more
+			// exploring!
+			return true;
+	}
+
+}

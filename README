@@ -1,0 +1,16 @@
+This is the README file for the stereotypical trust assessment simulator.
+
+
+
+Running Experiments
+-------------------------------
+
+You can set up an run experiments either by using the GUI class (ExperimentGUI), or by creating two configuration files describing the parameters of the experiment ([experiment_name].properties) and the agent profiles ([experiment_name].profiles). Examples of these files can be found in the /experiments directory. All experimental results will also appear in this directory.
+
+The GUI class works for most purposes, but isn't complete - it might be a better idea to manually create the *.profile and *.properties files (this is all that the GUI class does).
+
+To run experiments, use:
+
+java RunExperiment [experimentName]
+
+where the files experimentName.profiles and experimentName.properties (and, if biases are being used, an experimentName.bias file) are in the '/experiments' directory.

@@ -1,0 +1,10 @@
+# Profile file for the test experiment
+# The format is is ID,MEAN,STAND-DEV,COUNT:[FEATURES]:highEffprob,highEffCost,lowEffProb,lowEffCost
+# A feature is a tuple consisting of an identifier and a real value in [0,1] 
+# giving a probability of this profile possessing this feature
+# These profiles are each indicated by the presence of one feature and absence of the others.
+p1,0.9,0.05,100:[(f1,1.0),(f2,0.0),(f3,0.0),(f4,0.0),(f5,0.0),(f6,1.0)]
+p2,0.6,0.15,100:[(f1,0.0),(f2,1.0),(f3,0.0),(f4,1.0),(f5,0.0),(f6,0.0)]
+p3,0.4,0.15,100:[(f1,0.0),(f2,0.0),(f3,1.0),(f4,1.0),(f5,0.0),(f6,0.0)]
+p4,0.3,0.1,100:[(f1,0.0),(f2,1.0),(f3,1.0),(f4,0.0),(f5,1.0),(f6,0.0)]
+p5,0.0,1.0,100:[(f1,0.0),(f2,1.0),(f3,1.0),(f4,0.0),(f5,0.0),(f6,1.0)]

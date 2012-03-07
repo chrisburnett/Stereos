@@ -1,0 +1,9 @@
+# Bias file
+# Describes behavioural biases for trustees. Each row describes a particular profile and the effort level
+# agents of that profile will use when interacting with partners possessing features specified in [FEATURE LIST]
+# Syntax for behavioural bias: b,profile_id, effort_level_id,FEATURE_LIST
+# Syntax for perceptual bias: p,prodile_id,threshold,FEATURE_LIST
+p,p1,0.3,f2,f4
+p,p1,0.6,f1,f6
+p,p2,0.3,f1,f6
+p,p2,0.6,f2,f4

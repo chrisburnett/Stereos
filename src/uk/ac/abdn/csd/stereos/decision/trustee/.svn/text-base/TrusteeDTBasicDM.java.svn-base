@@ -1,0 +1,97 @@
+package uk.ac.abdn.csd.stereos.decision.trustee;
+
+import java.util.Map.Entry;
+
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+import uk.ac.abdn.csd.stereos.agents.Profile;
+
+
+/**
+ * This class represents a simple decision model not taking account of RIs
+ * @author cburnett
+ *
+ */
+public class TrusteeDTBasicDM extends TrusteeDecisionModel {
+	
+	@Override
+	public EffortLevel selectEffort(Delegation del, double reserve, Profile p) 
+	{
+		// without reputational incentives, the agent will either accept the contract or not,
+		// depending on the asking price. This is the simplest decision model which doesn't
+		// consider monitoring or effort level choice etc.
+		
+		// an agent's asking price is at least the cost of choosing its lowest effort level,
+		
+		// so the delegation object contains the payoffs the trustor is proposing
+		// the trustee also has some idea of its own competence
+		
+		// so the trustee just makes a decision on the basis of its own utility
+		// best EU is by default that presented by the agent's asking price
+		// will refuse if asking price not met
+		EffortLevel bestEffort = null;
+		double bestEU = reserve;
+				
+		// We, as trustee, need to check to see if monitored/unmonitored/RI
+		
+		if(del.getType() == Delegation.DELEGATION_UNMONITORED
+				|| del.getType() == Delegation.DELEGATION_SIMPLE)
+		{
+			// (unmonitored, hence unconditional) payoffs in case of success or failure
+			double uSucc = del.getSuccessPayoff();
+			double uFail = del.getFailurePayoff();
+			
+			// we need to find the probabilities of success/failure in each effort level
+			// in order to calculate an EU for each effort level
+			for(EffortLevel e : p.getEfforts().values())
+			{
+				// eu_succ will be p_succ * (u_succ - cost_effort)
+				double pSucc = e.successProbAtThreshold(del.getPerformanceThreshold());
+				double pFail = e.failureProbAtThreshold(del.getPerformanceThreshold());
+				
+				double euSucc = pSucc * (uSucc - e.getCost());
+				double euFail = pFail * (uFail - e.getCost());
+							
+				double euEffort = euSucc + euFail;
+				
+				if(euEffort >= bestEU)
+				{
+					bestEU = euEffort;
+					bestEffort = e;
+				}
+			}
+		}
+		else if(del.getType() == Delegation.DELEGATION_MONITORED)
+		{
+			// what to do if the delegation is monitored
+			// we now read the effort conditional contract
+			
+			// calculate EU of each effort level and make a choice
+			for(Entry<String, EffortLevel> entry : p.getEfforts().entrySet())
+			{
+				String effortId = entry.getKey();
+				EffortLevel thisEffort = entry.getValue();
+				
+				double eSuccPayoff = del.getFailurePayoff(effortId);
+				double eFailPayoff = del.getSuccessPayoff(effortId);
+				
+				double eFailProb = thisEffort.failureProbAtThreshold(del.getPerformanceThreshold());
+				double eSuccProb = thisEffort.successProbAtThreshold(del.getPerformanceThreshold());
+				
+				double eEU = (eFailProb*eFailPayoff) + (eSuccProb*eSuccPayoff) - thisEffort.getCost();
+				
+				// need to factor in asking price (cost of agent survival :))
+				if(eEU >= bestEU)
+				{
+					bestEU = eEU;
+					bestEffort = thisEffort;
+				}
+			}
+		}
+		// record the effort level selected in the delegation object
+		// bit of a side effect, but at the moment time is short and best practice is taking
+		// a back seat for a little bit
+		del.setTrusteeEffort(bestEffort);
+		return bestEffort;
+	}
+}

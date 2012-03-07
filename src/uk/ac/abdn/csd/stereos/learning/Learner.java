@@ -1,0 +1,53 @@
+package uk.ac.abdn.csd.stereos.learning;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.trust.sl.Opinion;
+import weka.classifiers.Classifier;
+
+public interface Learner
+{
+	
+	// maximum number of example experiences that will be passed to the learner
+	public static final int MAX_EXAMPLES = 50;
+
+
+	/**
+	 * Train the model from given opinions
+	 * 
+	 * @param opinions
+	 */
+	public void train(Map<Agent, Opinion> opinions);
+
+	/**
+	 * Train with certain features hidden (for reduced modelling)
+	 * 
+	 * @param opinions
+	 * @param hiddenFeatures
+	 */
+	public void train(Map<Agent, Opinion> opinions, Set<String> hiddenFeatures);
+
+	public Map<Agent, Double> getBaseRates(List<Agent> agents);
+
+	public boolean isReady();
+
+	/**
+	 * Return the error rate, or confidence of the model.
+	 * 
+	 * @return
+	 */
+	public double getErrorRate();
+
+	/**
+	 * Return the set of feature names considered salient by this model
+	 * 
+	 * @return
+	 */
+	public Set<String> getModelSignature();
+
+	public Classifier getClassifier();
+
+}

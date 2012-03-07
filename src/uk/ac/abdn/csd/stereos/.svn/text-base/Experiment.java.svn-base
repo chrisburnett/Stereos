@@ -1,0 +1,1163 @@
+package uk.ac.abdn.csd.stereos;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Map.Entry;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.BehaviouralBias;
+import uk.ac.abdn.csd.stereos.agents.PerceptualBias;
+import uk.ac.abdn.csd.stereos.agents.Profile;
+import uk.ac.abdn.csd.stereos.agents.evaluators.BiasedEvaluator;
+import uk.ac.abdn.csd.stereos.decision.trustee.TrusteeBiasedDM;
+import uk.ac.abdn.csd.stereos.decision.trustee.TrusteeDTBasicDM;
+import uk.ac.abdn.csd.stereos.decision.trustee.TrusteeDefaultDM;
+import uk.ac.abdn.csd.stereos.decision.trustee.TrusteeDecisionModel;
+import uk.ac.abdn.csd.stereos.decision.trustor.TrustorDTBasicDM;
+import uk.ac.abdn.csd.stereos.decision.trustor.TrustorDecisionModel;
+import uk.ac.abdn.csd.stereos.decision.trustor.TrustorMetaDM;
+import uk.ac.abdn.csd.stereos.decision.trustor.TrustorMostTrustedDM;
+import uk.ac.abdn.csd.stereos.exceptions.InvalidParametersException;
+import uk.ac.abdn.csd.stereos.reputation.AntiBiasFilter;
+import uk.ac.abdn.csd.stereos.trust.NoTrust;
+import uk.ac.abdn.csd.stereos.trust.TrustModel;
+import uk.ac.abdn.csd.stereos.trust.beta.DirectB;
+import uk.ac.abdn.csd.stereos.trust.beta.DirectRepB;
+import uk.ac.abdn.csd.stereos.trust.sl.DirectRepSL;
+//import uk.ac.abdn.csd.stereos.trust.sl.DirectRepStereoRepSL;
+import uk.ac.abdn.csd.stereos.trust.sl.DirectRepStereoSL;
+//import uk.ac.abdn.csd.stereos.trust.sl.DirectRepStereoSL;
+//import uk.ac.abdn.csd.stereos.trust.sl.DirectRepStereoSL;
+import uk.ac.abdn.csd.stereos.trust.sl.DirectSL;
+import uk.ac.abdn.csd.stereos.util.viewer.State;
+
+
+/**
+ * This class represents the simulation environment in which the agents 
+ * will interact. As such it performs the following roles:
+ * 
+ * <ul>
+ * <li>Creating and destroying agents</li>
+ * <li>Creating and destroying agent teams</li>
+ * <li>Providing an entity through which experimental data can be gathered</li>
+ * </ul>
+ * 
+ * @author Chris Burnett
+ *
+ */
+
+public class Experiment {
+
+	//These fields define the experimental condition constants
+	/**
+	 * Global interaction, global reputation 
+	 */
+	public static final int GGR = 1;
+	/**
+	 * AHT interaction, global reputation
+	 */
+	public static final int AGR = 2;
+	/**
+	 * AHT interaction, AHT reputation
+	 */
+	public static final int AAR = 3;
+	/**
+	 * GGR with stereotypes
+	 */
+	public static final int GGRS = 4;
+	/**
+	 * AGR with stereotypes
+	 */
+	public static final int AGRS = 5;
+	/**
+	 * AAR with stereotypes
+	 */
+	public static final int AARS = 6;
+
+	/**
+	 * No trust model (test)
+	 */
+	public static final int NT = 0;
+	
+	// test cases for the specific trust models
+	// first letter means global, second means reputation if present, last means method
+	/**
+	 * Global direct trust
+	 */
+	public static final int GD = 7;
+	/**
+	 * Ah-hoc direct trust
+	 */
+	public static final int AD = 8;
+	/**
+	 * Global direct trust, beta
+	 */
+	public static final int GB = 9;
+	public static final int GGB = 10;
+	
+	/**
+	 * Fields for special conditions
+	 */
+	public static final int MODE_NORMAL = 11;
+	// Reputational crash
+	public static final int MODE_CRASH = 12;
+	// remove feature correlations
+	public static final int MODE_NOCORR = 13;
+	// mix up profile parameters
+	public static final int MODE_MIX = 14;
+	// cause trustors to forget all direct experience, leaving stereotype
+	public static final int MODE_AMNESIA = 15;
+	// cause trustees to request 'random' asking prices
+	public static final int MODE_RANDOM_ASK = 17;
+	// cause trustees to behave according to biases specified in the .bias file
+	public static final int MODE_BIAS = 16;
+	
+	/**
+	 * Fields for filter types
+	 */
+	// no filtering of recommenders
+	public static final int FILTER_OFF = 101;
+	// antibias filtering
+	public static final int FILTER_ANTIBIAS = 102;
+	
+	/**
+	 * Fields for decision making evaluation conditions
+	 */
+	public static final int DM_MOST_TRUSTED = 200;
+	public static final int DM_BASIC = 201;
+	public static final int DM_MONITORING = 202;
+	public static final int DM_RI = 203;
+	public static final int DM_META = 220;
+	
+	
+	
+	/**
+	 * This structure maintains a list of all existing agents
+	 */
+	private List<Agent> agents;
+	private List<Agent> trustors;
+	
+	/**
+	 * This structure maintains a list of agent teams currently formed
+	 */
+	private List<List<Agent>> teams;
+	
+	/**
+	 * Agent assignment to teams
+	 */
+	private Map<Agent,List<Agent>> assignments;
+
+	/**
+	 * EXPERIMENTAL PARAMETER FIELDS
+	 */
+	// special mode of the experiment
+	private int mode;
+	// decision model used by agents
+	private int dm;
+	// maximum number of teams that can simultaneously exist
+	private int teamCount;
+	// number of agents in a team
+	private int teamSize;
+	// number of agents that will be created
+	private int trusteeCount;
+	// number of trustors to be assigned
+	private int trustorCount;
+	// number of 'noise' (non-profile) features each agent will possess
+	private int noiseFeatureCount;
+	// the number of different services agents can provide
+	//  - implement multiple trust issues/tasks etc.
+	//private int taskCount;
+	// number of time steps environment will run for
+	private int timeSteps;
+	// number of time steps that AHTs will live for (fixed for now)
+	private int teamLifeTime;
+	// the join/leave per round probability for agents
+	private double agentReplaceProb;
+	// the join/leave per round probability for agents
+	//private double trustorReplaceProb;
+	// interaction probability
+	private double interactProb;
+	// the condition this experiment is in
+	private int condition;
+	//PARAMETERS SPECIFIC TO FIRE-LIKE TRUST MODELS
+	private double temp;
+	private int halfLife;
+	// defaul maxqueries is 10
+	private int maxQueries;
+	// the name of this experimental profile
+	private String profileSet;
+	// the list of agent profiles in use for this experiment
+	private List<Profile> agentProfiles;
+	// The noise feature set that we will generate
+	private Map<String,Double> noiseFeatures;
+	// the maximum number of features that can be missing
+	private int maxMissingFeatures;
+	// probability of a missing feature
+	private double missingFeatureProb;
+	// the forgetting horizon - number of experiences to keep in the EB
+	// older ones will be 'forgotten'
+	//private int horizon;
+	
+	// shared random number generator instance
+	private Random random;
+	// unique ID counter for agents
+	private int id;
+	private int clusterCount;
+	private int learningInterval;
+	
+	// list of behavioural biases, if we are using them
+	private Map<Profile,List<BehaviouralBias>> bBiases;
+	// list of perceptual biases if we're using them also
+	private Map<Profile,List<PerceptualBias>> pBiases;
+	// recommender filtering
+	private int filtering;
+	
+	// TASK payoffs for the decision model, for the TRUSTOR
+	// payoff in case of success
+	private double successPayoff;
+	// payoff in case of failure
+	private double failurePayoff;
+	// payoff if the agent decides not to delegate
+	private double abstainPayoff;
+	// cost of monitoring
+	private double monitoringCost;
+	private List<State> history;
+	
+	/**
+	 * Set up this experiment file from the properties file at the given path
+	 * @param parameterPath path to the properties file
+	 * @param v - viewer object for displaying experiment graphically
+	 * @throws IOException 
+	 * @throws InvalidParametersException 
+	 */
+	public Experiment(String parameterPath, boolean record) throws IOException, InvalidParametersException
+	{
+		// initialise the random number generator
+		random = new Random();
+		
+		// Load in the properties from the path
+		Properties properties = new Properties();
+		FileInputStream in = new FileInputStream(parameterPath);
+		properties.load(in);
+		
+		// Read some parameters for validation
+		int teamCount = Integer.parseInt(properties.getProperty("teamCount"));
+		int teamSize = Integer.parseInt(properties.getProperty("teamSize"));
+		//int trustorCount = Integer.parseInt(properties.getProperty("trustorCount"));
+		
+		// Parse the profile file into a list of profiles
+		this.profileSet = properties.getProperty("profiles");
+		this.agentProfiles = Profile.parseAgentProfiles("experiments/"+this.profileSet+".profiles");
+		// Tally up the number of agents, according to the counts specified per profile
+		for(Profile p : agentProfiles)
+		{
+			this.trusteeCount += p.getTrusteeCount();
+			this.trustorCount += p.getTrustorCount();
+		}
+		
+		// Validate the experiment parameters
+		validate();
+		
+		// Set up our local parameters
+		this.teamCount = teamCount;
+		this.teamSize = teamSize;
+		this.timeSteps = Integer.parseInt(properties.getProperty("timeSteps"));
+		this.teamLifeTime = Integer.parseInt(properties.getProperty("teamLifeTime"));
+		this.noiseFeatureCount = Integer.parseInt(properties.getProperty("noiseFeatureCount"));
+		this.maxMissingFeatures = Integer.parseInt(properties.getProperty("maxMissingFeatures"));
+		this.missingFeatureProb = Double.parseDouble(properties.getProperty("missingFeatureProb"));
+		this.agentReplaceProb = Double.parseDouble(properties.getProperty("agentReplaceProb"));
+		//this.trustorReplaceProb = Double.parseDouble(properties.getProperty("trustorReplaceProb"));
+		this.interactProb = Double.parseDouble(properties.getProperty("interactProb"));
+		this.successPayoff = Double.parseDouble(properties.getProperty("successPayoff"));
+		this.failurePayoff = Double.parseDouble(properties.getProperty("failurePayoff"));
+		this.abstainPayoff = Double.parseDouble(properties.getProperty("failToDelegatePayoff"));
+		this.monitoringCost = Double.parseDouble(properties.getProperty("monitoringCost"));
+		// Parameters and checks for specific trust models
+		// -1 indicates error for these parameters
+		String halfLifeString = properties.getProperty("halfLife");
+		//String horizonString = properties.getProperty("horizon");
+		String tempString = properties.getProperty("temperature");
+		String maxQueriesString = properties.getProperty("maxQueries");
+		String learningIntervalString = properties.getProperty("learningInterval");
+		String clusterCountString = properties.getProperty("clusterCount");
+		if(halfLifeString != null)
+			this.halfLife = Integer.parseInt(halfLifeString);
+		else halfLife = -1;
+		if(tempString != null)
+			this.temp = Double.parseDouble(tempString);
+		else temp = -1;
+		if(maxQueriesString != null)
+			this.maxQueries = Integer.parseInt(maxQueriesString);
+		else maxQueries = 10;
+		if(learningIntervalString != null)
+			this.learningInterval = Integer.parseInt(learningIntervalString);
+		else this.learningInterval = -1;
+		if(clusterCountString != null)
+			this.clusterCount = Integer.parseInt(clusterCountString);
+		else this.clusterCount = -1;
+		//if(horizonString != null)
+		//	this.horizon = Integer.parseInt(horizonString);
+		//else this.horizon = 100;
+		
+		// set agent id counter to 0
+		id = 0;
+		
+		// Set the experimental mode (modifier over the condition)
+		String modeString = properties.getProperty("mode");
+		if(modeString.equalsIgnoreCase("crash"))
+			this.mode = MODE_CRASH;
+		else if(modeString.equalsIgnoreCase("nocorr"))
+			this.mode = MODE_NOCORR;
+		else if(modeString.equalsIgnoreCase("mix"))
+			this.mode = MODE_MIX;
+		else if(modeString.equalsIgnoreCase("amnesia"))
+			this.mode = MODE_AMNESIA;
+		else if(modeString.equalsIgnoreCase("randomask"))
+			this.mode = MODE_RANDOM_ASK;
+		else if(modeString.equalsIgnoreCase("bias"))
+		{
+			this.mode = MODE_BIAS;
+			// read in behavioural and perceptual bias descriptions
+			this.bBiases = BehaviouralBias.parseBiases("experiments/"+this.profileSet+".bias", agentProfiles);
+			this.pBiases = PerceptualBias.parseBiases("experiments/"+this.profileSet+".bias", agentProfiles);
+		}
+		else
+			this.mode = MODE_NORMAL;
+				
+		// decision model setup
+		String dmString = properties.getProperty("decisionModel");
+		if(dmString.equalsIgnoreCase("basic"))
+			this.dm = DM_BASIC;
+		if(dmString.equalsIgnoreCase("meta"))
+			this.dm = DM_META;
+		else
+			this.dm = DM_MOST_TRUSTED;
+		
+		// filtering setup
+		String filterString = properties.getProperty("filter");
+		if(filterString == null) 
+			this.filtering = FILTER_OFF;
+		else if(filterString.equalsIgnoreCase("antibias"))
+			this.filtering = FILTER_ANTIBIAS;
+		else
+			this.filtering = FILTER_OFF;
+		
+		// Object maintaining a history of states for the experiment, to allow playback
+		// if recording is active
+		if(record) history = new LinkedList<State>();
+	}
+	
+	/**
+	 * Run the experiment.
+	 * This method carries out the experiment loop to the desired number of steps.
+	 * @throws InvalidParametersException 
+	 */
+	public void run() throws InvalidParametersException
+	{
+		// initialise the experiment
+		init();
+		// this variable keeps track of how many cycles are left before we recreate the teams
+		int teamLifeTimeRemaining = this.teamLifeTime;
+		
+		// Keeps track of current time step
+		int currentTimeStep;
+		// interval at which to display an asterisk
+		int displayDiv = this.timeSteps/20;
+		
+		// MAIN LOOP:
+		// for each time step, execute:
+		for(currentTimeStep=0; currentTimeStep < this.timeSteps; currentTimeStep++)
+		{	
+			// change profiles, if the experimental mode calls for it
+			if(mode != MODE_NORMAL) doSpecialConditions(currentTimeStep, this.mode);
+			
+			// keep track of the interacting parties
+			Map<Agent,Agent> interactors = new HashMap<Agent,Agent>();
+			if((displayDiv > 0) && (currentTimeStep % displayDiv == 0)) System.out.print("*");
+			// simulate agents leaving and joining
+			trusteeReplace();
+			//trustorReplace();
+			// If the AHT lifetime has been reached, re-form the teams and reset the counter
+			if(teamLifeTimeRemaining <= 0) {
+				this.teams = createTeams(this.teamCount, this.teamSize);
+				// reassign the trustors
+				this.assignTrustorsToTeams();
+				teamLifeTimeRemaining = this.teamLifeTime;
+			} else {
+				// otherwise, decrement the counter
+				teamLifeTimeRemaining--;
+			}
+			// reassign roles - this enforces the property that agents switch
+			// roles randomly each round, should result in more interactions
+			//assignRoles(this.teams)
+			
+			// tell all trustors in teams to pick a partner and delegate...
+			// how they do this will ultimitely be decided by the trust model they are using
+			
+			for(Agent t : trustors)
+			{
+				Agent trustee = null;
+				// implement interaction probability
+				double chance = random.nextDouble();
+				if(chance <= interactProb) {
+					trustee = t.delegate(successPayoff,failurePayoff,abstainPayoff,monitoringCost,currentTimeStep);
+					// if an interaction happened
+					if(trustee != null)
+						// then record they interacted
+						interactors.put(t,trustee);
+				}
+			}
+			
+			// Agents are penalised 1 for not interacting and get 1 for interacting
+			for(Agent a : agents)
+			{
+				// if an agent is in a team but is not selected as a partner, deduct. But agents who are not
+				// in teams cannot be blamed for not getting to interact because the team formation is random.
+				// NOTE this would have to change if team formation itself was trust based.
+				if(assignments.containsKey(a) && a.getRole() == Agent.TRUSTEE) {
+					// linear time operation - searching for value - not good :)
+					if(interactors.containsValue(a))
+						a.incUtility(1); // if the agent is in a team and selected
+					else a.decUtility(0.01); // in a team and not selected
+				} else a.incUtility(0); // not in a team
+			}
+			
+			// now that the state has changed, add it to the history
+			if(history != null) history.add(new State(this.agents,this.trustors,this.teams,this.assignments,interactors));	
+		}
+	}
+
+	/**
+	 * Change the profiles in some way as required by the experimental condition,
+	 * halfway through the experiment.
+	 * 
+	 * @param currentTimeStep
+	 * @param mode - currently supports MODE_CRASH and MODE_NOCORR, representing 
+	 * reputational crash (i.e. good agents becoming bad) and correlation breakdown
+	 * (i.e. diminishing ability of the profiles to be good predictors of behaviour
+	 */
+	private void doSpecialConditions(int currentTimeStep, int mode)
+	{	
+		// cause trustees to ask for varying (and irrational) asking prices
+		// for evaluating the basic decision making model in a simple way
+		if(mode == MODE_RANDOM_ASK && currentTimeStep == 1)
+		{
+			// vary the asking price either up or down by a 'max' factor (;)) of 2
+			double max_factor = 2;
+			double factor = random.nextDouble() * max_factor;
+			// randomly set the 'sign' of the scale - whether to increase or decrease the
+			// asking price
+			boolean sign;
+			if(random.nextDouble() >= 0.5)
+				sign = true;
+			else
+				sign = false;
+
+			for(Agent a : agents)
+			{
+				// mult for increase, div for decrease... I think...
+				double defaultAsk = a.getProfile().getDefaultAskingPrice();
+				if(sign)
+					a.setAskingPrice(factor*defaultAsk);
+				else
+					a.setAskingPrice(factor/defaultAsk);
+			}
+		}
+		// if we are halfway through:
+		if(currentTimeStep == this.timeSteps/2) {
+			for(Profile p : agentProfiles) 
+			{
+				// reputational crash
+				// turn good agents bad, and bad agents good
+				if(mode == MODE_CRASH)
+				{
+					p.setDefaultMeanPerformance(1 - p.getDefaultMeanPerformance());
+				}
+				// CORRELATION LOSS
+				// if we are in the correlation loss mode, then we are deactivating
+				// all F-B correlations halfway through the simulation to see how 
+				// quickly the algorithm notices.
+				if(mode == MODE_NOCORR)
+				{
+					p.setDefaultMeanPerformance(0.5);
+					p.setDefaultVariance(1);
+				}
+				// PROFILE MIX
+				// mix up the parameters of profile 
+				// how do we do this?
+				// make a copy of the profile list
+				// pop off a random pair, swap their parameters
+				// if we are left with a singleton, just swap it with a random partner from the singleton list
+				if(mode == MODE_MIX)
+				{
+					List<Profile> profileListCopy = new ArrayList<Profile>(this.agentProfiles);
+					while(!profileListCopy.isEmpty())
+					{
+						Profile pa,pb;
+						pa = profileListCopy.remove(random.nextInt(profileListCopy.size()));
+						if(profileListCopy.isEmpty())
+							pb = agentProfiles.get(random.nextInt(agentProfiles.size()));
+						else pb = profileListCopy.remove(random.nextInt(profileListCopy.size()));
+						
+						double pam = pa.getDefaultMeanPerformance();
+						double pbm = pb.getDefaultMeanPerformance();
+						double pav = pa.getDefaultVariance();
+						double pbv = pb.getDefaultVariance();
+						
+						pa.setDefaultMeanPerformance(pbm);
+						pb.setDefaultMeanPerformance(pam);
+						pa.setDefaultVariance(pbv);
+						pb.setDefaultVariance(pav);
+					}
+				}
+				
+				// remove all direct experiences
+				// this is to simulate all trustors leaving and new ones coming in
+				// with no direct experiences but inheriting the stereotypical biases/models
+				// i.e. parents and offspring
+				if(mode == MODE_AMNESIA)
+				{
+					for(Agent t : trustors)
+					{
+						t.getTrustModel().evidenceReset();
+					}
+				}
+
+			}
+		}
+	}
+	
+	/**
+	 * Basic parameter validation
+	 * @param teamSize
+	 * @param teamCount
+	 * @param trusteeCount
+	 * @param trustorCount
+	 * @throws InvalidParametersException
+	 */
+	private void validate() throws InvalidParametersException
+	{
+		// Make sure the parameters are OK
+		// Enforce the requirement that there must be enough agents created to satisfty the teams requested
+		if ((teamCount * teamSize) > (trusteeCount+trustorCount))
+			throw new InvalidParametersException();
+		// Cannot specify more feautres to be missing than the size of the feature vector.
+		// also, we don't allow all features to be missing.
+		//if (maxMissingFeatures >= (agentProfiles.get(0).getFeatures().size() + noiseFeatureCount))
+		//	throw new InvalidParametersException();
+	}
+	
+	/**
+	 * Initialise the experiment
+	 * @throws InvalidParametersException if the given parameters are invalid
+	 */
+	private void init() throws InvalidParametersException
+	{	
+		// Create the assignment and ratings stores
+		assignments = new HashMap<Agent,List<Agent>>();
+		
+		// Set up the noise features
+		noiseFeatures = new HashMap<String,Double>();
+		for(int i = 0; i < this.noiseFeatureCount; i++)
+		{
+			// Generate a new noise feature label and probability
+			String id = "nf"+i;
+			double p = random.nextDouble();
+			noiseFeatures.put(id, p);
+		}
+		// Create agents (trustees)
+		agents = createAgents();
+		// create our now-and-forever trustors :)
+		trustors = createTrustors();
+		// create the teams
+		teams = createTeams(this.teamCount, this.teamSize);
+		// assign the trustors
+		this.assignTrustorsToTeams();
+	}
+
+	/**
+	 * Returns a new trust model appropriate for the given condition
+	 * @param condition experimental condition
+	 * @return a trust model appropriate for this condition
+	 * @throws InvalidParametersException if the given parameters are invalid for the chosen trust model
+	 */
+	private TrustModel getTrustModelForCondition(int condition) throws InvalidParametersException
+	{
+		// check to see that the parameters are valid
+		if((halfLife == -1 || temp == -1) && (condition > 0))
+			throw new InvalidParametersException();
+		if((learningInterval == -1 || clusterCount == -1) && condition == Experiment.GGRS)
+			throw new InvalidParametersException();
+
+		switch (condition) {
+		case Experiment.NT: return new NoTrust();
+		case Experiment.GD:
+		case Experiment.AD:
+			return new DirectSL(temp, halfLife);
+		case Experiment.GGR:
+		case Experiment.AAR:
+		case Experiment.AGR:
+			return new DirectRepSL(temp, halfLife);
+			//return new DirectRepStereoSL(temp, halfLife, learningInterval, clusterCount);
+		case Experiment.GGRS:
+		case Experiment.AGRS:
+		case Experiment.AARS:
+			return new DirectRepStereoSL(temp, halfLife, learningInterval, clusterCount);
+		case Experiment.GB:
+			return new DirectB(temp, halfLife);
+		case Experiment.GGB:
+			return new DirectRepB(temp,halfLife);
+		}
+		return null;
+	}
+	
+	/**
+	 * Instantiate the agents participating in this experiment
+	 * 
+	 * @see Experiment.createTeams()
+	 * @throws InvalidParametersException if the given parameters are invalid for an agent
+	 */
+	private List<Agent> createAgents() throws InvalidParametersException {
+		// Create our agent (trustee) list
+		List<Agent> agents = new ArrayList<Agent>(trusteeCount);
+		for (Profile p : agentProfiles) {
+			// Create a number of agents of the current profile
+			for(int j = 0; j < p.getTrusteeCount(); j++)
+			{
+				// create a new agent
+				Agent newAgent = createAgent("a"+(id++),p);
+				newAgent.setRole(Agent.TRUSTEE); // trustee 
+				
+				// add this agent to the agent registry
+				agents.add(newAgent);
+			}
+		}
+		return agents;
+	}
+	
+	/**
+	 * Create a list of trustor agents, according to profiles
+	 * @return
+	 * @throws InvalidParametersException 
+	 */
+	private List<Agent> createTrustors() throws InvalidParametersException
+	{
+		int tid=0;
+		List<Agent> trustors = new ArrayList<Agent>(trustorCount);
+		for(Profile p : agentProfiles)
+		{
+			for(int i=0; i < p.getTrustorCount(); i++)
+			{
+				Agent newTrustor = createAgent("t"+(tid++),p);
+				newTrustor.setRole(Agent.TRUSTOR); 
+				
+				// if we are using perceptual biases, set it up here
+				// otherwise default threshold (0.5) evaluators will be used
+				if(mode == MODE_BIAS)
+				{
+					// if this profile has a perceptual bias, create a new perceptual biased evaluator
+					if(pBiases.containsKey(p))
+						newTrustor.setPerformanceEvaluator(new BiasedEvaluator(pBiases.get(p)));
+				}
+				// if filtering is requested up to cope with biased opinions coming in, set it
+				// but only in repuation conditions
+				if(condition >= GGR && condition <= AARS && this.filtering == FILTER_ANTIBIAS)
+				{
+					AntiBiasFilter newFilter = new AntiBiasFilter(newTrustor);
+					// set the same learning interval as the trust model uses
+					newFilter.setLearningInterval(learningInterval);
+					newTrustor.setFilter(newFilter);
+				}
+				
+				trustors.add(newTrustor);
+			}
+		}
+		return trustors;
+	}
+	
+	/**
+	 * Generate a single agent
+	 * @param id identifier
+	 * @param p profile
+	 * @throws InvalidParametersException 
+	 */
+	private Agent createAgent(String id, Profile p) throws InvalidParametersException
+	{
+		// Get a new complete feature vector for this agent including both noise and profile features
+		Map<String,Integer> featureVector = createFeatureVector(p);
+		// Get a new agent with a trust model appropriate for this experimental condition
+		// depending on the mode, create either a normal agent, or a decision theoretic one
+		// with the richer model of trust decision	
+		Agent newAgent = new Agent(id,getTrustModelForCondition(this.condition),getTrustorDecisionModelForMode(),getTrusteeDecisionModelForMode(p),p,featureVector,this);
+		return newAgent;
+	}
+	
+	/**
+	 * Return a new trustor decision model appropriate for the current mode
+	 * @param mode
+	 * @return
+	 */
+	private TrustorDecisionModel getTrustorDecisionModelForMode() {
+		// only one properly implemented for now
+		if(this.dm == DM_BASIC)
+			return new TrustorDTBasicDM();
+		if(this.dm == DM_META)
+			return new TrustorMetaDM();
+		else return new TrustorMostTrustedDM();
+	}
+	
+	/**
+	 * Return a new trustee decision model appropriate for the current mode
+	 * @param mode
+	 * @return
+	 */
+	private TrusteeDecisionModel getTrusteeDecisionModelForMode(Profile p)
+	{
+		if(mode == MODE_BIAS)
+		{
+			// return a new biased model if a bias exists for the specified profile - otherwise use default model
+			if(bBiases.containsKey(p))
+				return new TrusteeBiasedDM(bBiases.get(p));
+			else return new TrusteeDefaultDM();
+		}
+		if(dm == DM_MOST_TRUSTED)
+			return new TrusteeDefaultDM();
+		if(dm == DM_BASIC)
+			return new TrusteeDTBasicDM();
+		if(dm == DM_META)
+			return new TrusteeDTBasicDM();
+		else
+			return new TrusteeDefaultDM();
+	}
+
+	/**
+	 * Simulate the joining and leaving of agents
+	 * @throws InvalidParametersException 
+	 */
+	private void trusteeReplace() throws InvalidParametersException
+	{
+		// duplicate the agent list
+		List<Agent> agentsCopy = new ArrayList<Agent>(agents);
+		// only if we have set a probability higher than zero
+		if(agentReplaceProb > 0)
+			for(Agent a : agentsCopy)
+			{
+				double chance = random.nextDouble();
+				// if this particular agent is unlucky...
+				if(chance <= agentReplaceProb){
+					replaceAgent(a);
+				}
+			}
+	}
+	
+	/**
+	 * Remove an agent and replace it with a new one of the same profile (to maintain the 
+	 * initially specified balance of agent profiles).
+	 * 
+	 * @throws InvalidParametersException 
+	 */
+	private void replaceAgent(Agent oldAgent) throws InvalidParametersException
+	{
+		Profile thisProfile = oldAgent.getProfile();
+		// purge this agent from the experiment
+		agents.remove(oldAgent);
+		Agent newAgent = createAgent("a"+(id++),thisProfile);
+
+		// if the agent is in a team, remove it from the team and assignments list as well
+		if(assignments.containsKey(oldAgent))
+		{
+			List<Agent> thisTeam = assignments.get(oldAgent);
+			thisTeam.remove(oldAgent);
+			assignments.remove(oldAgent);
+			
+			// add new agent
+			thisTeam.add(newAgent);
+			assignments.put(newAgent, thisTeam);
+		}
+		// add the agent to the agent list
+		// will have the same chance of being assigned to a team as anyone else, in the next step
+		agents.add(newAgent);
+	}
+
+	/**
+	 * Create (or re-create) the agent teams
+	 * 
+	 * Populate the teams with the required number of agents, drawn randomly from the global pool
+	 * 
+	 * @param teamSize 
+	 * @param teamCount 
+	 */
+	private List<List<Agent>> createTeams(int teamCount, int teamSize) {
+		// Create our new list of teams
+		List<List<Agent>> teams = new ArrayList<List<Agent>>(teamCount);
+		
+		// Duplicate and shuffle the agent-list so we don't damage it by removing elements
+		List<Agent> agentListCopy = new ArrayList<Agent>(this.agents);
+		// remove the trustors from our duplicate list - we'll assign them later
+		//agentListCopy.removeAll(this.trustors);
+		
+		// Create new assignments table (resets)
+		Map<Agent,List<Agent>> newAssignments = new HashMap<Agent,List<Agent>>();
+		
+		// 'Randomise' the ordering of our agent list
+		Collections.shuffle(agentListCopy);
+		
+		// for each team
+		for(int i = 0; i < teamCount; i++)
+		{
+			// instantiate the team
+			List<Agent> team = new ArrayList<Agent>();
+			// populate
+			for (int j=0; j < teamSize; j++) {
+				// if there are agents left, then assign them
+				// if not, we're on the last team, and someone will be short a few members :)
+				if(!agentListCopy.isEmpty()) {
+					// Remove an agent from the front of the list and add it to the current team
+					Agent thisAgent = agentListCopy.remove(0);
+					// add the agent to the team
+					team.add(thisAgent);
+					// record seperately which team this agent has been assigned to for fast lookup
+					newAssignments.put(thisAgent, team);
+				}
+			}
+			// add the team to the team list
+			teams.add(team);
+		}
+		// update the assignments and return the new teams
+		this.assignments = newAssignments;
+		return teams;
+	}
+
+	/**
+	 * Returns a set of features for a given profile, incorporating
+	 * the both the feature probabilities of the profile and those
+	 * of the experiment as a whole.
+	 * 
+	 * Note - noise features are all labelled 'nf#'; don't use this prefix
+	 * for user-specified profile features!
+	 * 
+	 * @param profile
+	 * @return a complete feature vector for an agent of this profile.
+	 */
+	private Map<String,Integer> createFeatureVector(Profile profile)
+	{		
+		// The list we will return
+		//List<String> featureVector = new ArrayList<String>();
+		Map<String,Integer> featureVector = new HashMap<String,Integer>();
+		
+		Map<String,Double> features = profile.getFeatures();
+		
+		// Add the noise features to those to be assigned
+		features.putAll(this.noiseFeatures);
+		
+		// Assign diagnostic features
+		for(Entry<String,Double> f : features.entrySet())
+		{
+			int present = 0;
+			// Get the specifics of this profile
+			String fid = f.getKey();
+			Double fp = f.getValue();
+			
+			// For each feature specified by the profile, roll the dice...
+			// we are picking from uniformly distributed (mean 0.0, sd 1) values
+			double chance = random.nextDouble();
+			// If it's greater than the probability value given in the profile, assign
+			if(chance <= fp) present = 1;
+				
+			featureVector.put(fid,present);
+		}
+		
+		// for feature hiding purposes - we are creating this array so that we can
+		// 'efficiently' chose a random feature to hide, even though a map is not random access
+		String[] featureKeys = features.keySet().toArray(new String[0]);
+		
+		// remove features according to experimental parameters
+		for(int k = 0; k < maxMissingFeatures; k++)
+		{
+			// if probabilistically determined
+			if(random.nextDouble() < missingFeatureProb)
+			{
+				//featureVector.remove(featureKeys[random.nextInt(featureKeys.length)]);  // lobotomising the array :)
+				featureVector.put(featureKeys[random.nextInt(featureKeys.length)],null); // setting to null
+			}
+		}
+		
+		// System.out.println(featureVector);
+		return featureVector;
+	}
+
+	/**
+	 * Randomly assign the trustors to teams
+	 */
+	private void assignTrustorsToTeams()
+	{
+		// for each trustor,
+		// pick a random team from the team list and chuck him in
+		for(Agent trustor : trustors)
+		{
+			List<Agent> team = teams.get(random.nextInt(teams.size()));
+			team.add(trustor);
+			// assign the trustor to the team
+			this.assignments.put(trustor, team);
+		}
+	}
+	
+	/**
+	 * Filter the list of agents according to role; return only a set of <i>trustees</i>.
+	 * @param candidates
+	 * @return a list of trustees
+	 */
+	private List<Agent> filterTrustees(List<Agent> candidates)
+	{
+		List<Agent> trustees = new ArrayList<Agent>();
+		// filter the candidates
+		for(Agent a : candidates)
+		{
+			if(a.getRole() == Agent.TRUSTEE)
+				trustees.add(a);
+		}
+		return trustees;
+	}
+
+	/**
+	 * Return a list of candidates that this agent can interact with
+	 * @param agent
+	 * @return list of agents
+	 */
+	public List<Agent> getDelegationCandidates(Agent agent) {
+		// If we are running the global direct and reputational mode, then
+		// return the set of all agents. That is, we are ignoring the existance of teams.
+		// The agent itself will have to look through all the possible agents
+		switch(this.condition)
+		{
+			// In these cases, return the entire set of agents
+			case Experiment.GGR:
+			case Experiment.GGRS:
+			case Experiment.GD:
+			case Experiment.GB:
+			case Experiment.GGB:
+			case Experiment.NT:
+				return this.agents;
+				// If we are in the ad-hoc team case, return the list of agents in this agent's team
+			case Experiment.AD:
+			case Experiment.AAR: 
+			case Experiment.AARS: 
+			case Experiment.AGR: 
+			case Experiment.AGRS:
+				return filterTrustees(this.assignments.get(agent));
+		}
+		return null;
+	}
+	
+	/**
+	 * Return a list of candidates that an agent can ask for reputational opinions
+	 * @param agent
+	 * @return
+	 */
+	public List<Agent> getReputationCandidates(Agent agent) {
+		// If we are running in global reputation mode, return a list of size
+		// maxQueries from the global agent pool. In ad-hoc reputation conditions,
+		// return the same but from the ad-hoc team
+		switch(condition)
+		{
+			case Experiment.GGR:
+			case Experiment.GGRS:
+			case Experiment.AGR:
+			case Experiment.AGRS:
+			case Experiment.GD:
+			case Experiment.GB:
+			case Experiment.GGB:
+			case Experiment.NT:
+				// in the global case, select maxQueries recommenders from the global set
+				return this.trustors;
+			case Experiment.AD:
+			case Experiment.AAR: 
+			case Experiment.AARS: 
+				// in the ad-hoc case, select them from the ad-hoc team the agent is in
+				//return this.assignments.get(agent);
+				return trustorsInTeam(agent,assignments.get(agent));
+		}
+		return null;
+	}
+
+	private List<Agent> trustorsInTeam(Agent agent, List<Agent> team) 
+	{
+		List<Agent> result = new ArrayList<Agent>();
+		for(Agent a : team)
+			if(a.getRole() == Agent.TRUSTOR && !a.equals(agent)) result.add(a);
+		return result;
+	}
+
+	/**
+	 * Print out some diagnostic information about the status of the experiment to the console
+	 * 
+	 * @return A string containing status information
+	 */
+	public String getStatus()
+	{
+		StringBuffer out = new StringBuffer();
+		out.append("Experiment Properties:\n");
+		out.append("Profile: "+this.profileSet+"\n");
+		out.append("Condition: "+this.condition+"\n");
+		out.append("Number of agents: " + this.trusteeCount +"\n");
+		out.append("Number of teams : " + this.teams.size() + "\n");
+		Iterator<List<Agent>> i = this.teams.iterator();
+		while(i.hasNext())
+			out.append(i.next()+"\n");
+		return out.toString();
+		
+	}
+	
+	/**
+	 * Convenience method to hand over a list of all the agents in the simulation
+	 * @return a list containing all the agents
+	 */
+	public List<Agent> getAgents()
+	{
+		return agents;
+	}
+
+
+	public List<Profile> getAgentProfiles() {
+		return agentProfiles;
+	}
+
+	public void setAgentProfiles(List<Profile> agentProfiles) {
+		this.agentProfiles = agentProfiles;
+	}
+
+	public int getTimeSteps() {
+		return timeSteps;
+	}
+
+	public void setTimeSteps(int timeSteps) {
+		this.timeSteps = timeSteps;
+	}
+
+	public String getProfileName() {
+		return profileSet;
+	}
+
+	public void setProfileName(String profileName) {
+		this.profileSet = profileName;
+	}
+
+	public int getCondition() {
+		return condition;
+	}
+
+	public void setCondition(int condition) {
+		this.condition = condition;
+	}
+
+	public List<State> getHistory() {
+		return history;
+	}
+
+	public void setHistory(List<State> history) {
+		this.history = history;
+	}
+
+	public int getTeamCount() {
+		return teamCount;
+	}
+
+	public void setTeamCount(int teamCount) {
+		this.teamCount = teamCount;
+	}
+
+	public int getTeamSize() {
+		return teamSize;
+	}
+
+	public void setTeamSize(int teamSize) {
+		this.teamSize = teamSize;
+	}
+
+	public int getAgentCount() {
+		return trusteeCount;
+	}
+
+	public void setAgentCount(int agentCount) {
+		this.trusteeCount = agentCount;
+	}
+
+	public int getNoiseFeatureCount() {
+		return noiseFeatureCount;
+	}
+
+	public void setNoiseFeatureCount(int noiseFeatureCount) {
+		this.noiseFeatureCount = noiseFeatureCount;
+	}
+
+	public int getTrustorCount() {
+		return trustorCount;
+	}
+
+	public void setTrustorCount(int trustorCount) {
+		this.trustorCount = trustorCount;
+	}
+
+	public int getTeamLifeTime() {
+		return teamLifeTime;
+	}
+
+	public void setTeamLifeTime(int teamLifeTime) {
+		this.teamLifeTime = teamLifeTime;
+	}
+
+	public double getTemp() {
+		return temp;
+	}
+
+	public void setTemp(double temp) {
+		this.temp = temp;
+	}
+
+	public int getHalfLife() {
+		return halfLife;
+	}
+
+	public void setHalfLife(int halfLife) {
+		this.halfLife = halfLife;
+	}
+
+	public int getMaxQueries() {
+		return maxQueries;
+	}
+
+	public void setMaxQueries(int maxQueries) {
+		this.maxQueries = maxQueries;
+	}
+
+	public int getMode() {
+		return mode;
+	}
+
+	public void setMode(int mode) {
+		this.mode = mode;
+	}
+
+	public List<Agent> getTrustors() {
+		return trustors;
+	}
+
+	public void setMonitoringCost(double monitoringCost) {
+		this.monitoringCost = monitoringCost;
+	}
+
+	public double getMonitoringCost() {
+		return monitoringCost;
+	}
+	 
+}

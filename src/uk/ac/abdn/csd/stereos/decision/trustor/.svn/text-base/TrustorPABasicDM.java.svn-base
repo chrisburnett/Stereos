@@ -1,0 +1,165 @@
+package uk.ac.abdn.csd.stereos.decision.trustor;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.apache.commons.math.optimization.GoalType;
+import org.apache.commons.math.optimization.OptimizationException;
+import org.apache.commons.math.optimization.RealPointValuePair;
+import org.apache.commons.math.optimization.linear.LinearConstraint;
+import org.apache.commons.math.optimization.linear.LinearObjectiveFunction;
+import org.apache.commons.math.optimization.linear.Relationship;
+import org.apache.commons.math.optimization.linear.SimplexSolver;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+
+/**
+ * This class represents a basic Principal Agent implementation of a trustor's decision model, not taking into
+ * account monitoring or reputational incentive.
+ * 
+ * Could have a 'meta' model which just runs the other models and picks the best contract.
+ * 
+ * @author cburnett
+ *
+ */
+public class TrustorPABasicDM extends TrustorDecisionModel {
+
+	@Override
+	/**
+	 * The result of this method will be a delegation, or 'proposal' object to
+	 * be sent to the selected agent. If the agent decides not to delegate, null will
+	 * be returned instead
+	 * 
+	 * At the moment, risk neutral
+	 * 
+	 * 
+	 * @returns a delegation object, or null if agent decides not to delegate
+	 */
+	public Delegation selectAgent(Map<Agent, Double> unconditionalOpinions, Map<Agent,Map<EffortLevel,Double>> conditionalOpinions, double uSucc, double uFail, double uAbs, double monitoringCost) 
+	{
+		// needs to generate a 'contract'
+		// fundamental principle is that the trustor acts in a way to maximise EU
+		// so for each agent we calculate this
+		
+		Agent bestAgent = null;
+		double bestEU = 0.0;
+		Map<Integer,Double> bestContract = null;
+		// Work which of the known agents is the best
+		// i.e. choose the agent with the highest probability expectation value
+		
+		// the abstainance EU is the same for all agents
+		// we assume here that, in the case of abstainance, the agent gets
+		// a definite payoff. However, this could easily be probabilistic; if abstain means
+		// to do the task by onesself, this could be subject to self-trust.
+		//double euAbstain = uAbs;
+				
+		for(Entry<Agent, Map<EffortLevel,Double>> a : conditionalOpinions.entrySet())
+		{
+			Agent agent = a.getKey();
+			Map<EffortLevel,Double> conditionalRatings = a.getValue();
+			
+			// no peeking - ideally (even as the programmer) we shouldn't be able to see
+			// the whole thing
+			Map<String,EffortLevel> availableEfforts = agent.getEffortCosts();
+			
+			// three step procedure to calculate best EU
+			// contract for each effort level
+			Map<EffortLevel,Map<Integer,Double>> contracts = new HashMap<EffortLevel,Map<Integer,Double>>();
+			
+			double reserve = agent.getAskingPrice();
+			
+			// for each effort level calculate the minimum contract and store
+			for(EffortLevel e : availableEfforts.values())
+			{
+				double p=0.5;
+
+				if(conditionalRatings.get(e) != null)
+					p = conditionalRatings.get(e);
+				
+				double costy = e.getCost();
+				
+				// set up (linear i.e. risk neutral) optimiser
+				LinearObjectiveFunction c_e2 = new LinearObjectiveFunction(new double[] { p, 1-p }, costy);
+				Collection<LinearConstraint> constraints = new ArrayList<LinearConstraint>();
+				
+				// Participation constraint
+				constraints.add(new LinearConstraint(new double[] { p, 1-p }, costy , Relationship.GEQ, new double[] {0,0}, reserve));
+				
+				// incentive compat is actually multiple constraints
+				for(EffortLevel ep : availableEfforts.values())
+					if(!ep.equals(e))
+						constraints.add(new LinearConstraint(new double[] { p, 1-p }, costy, Relationship.GEQ, new double[] {conditionalRatings.get(ep), 1-conditionalRatings.get(ep)}, ep.getCost()));
+				// create and run the solver
+				SimplexSolver solver = new SimplexSolver();
+				RealPointValuePair contract;
+				try {
+					contract = solver.optimize(c_e2, constraints, GoalType.MINIMIZE, true);
+				
+					// get the solution
+					double im = contract.getPoint()[0];
+					double ip = contract.getPoint()[1];
+					//System.out.println(ip + " : " + contract.getValue() + " : " + reserve); // debug
+
+					if(!contracts.containsKey(e)) contracts.put(e, new HashMap<Integer,Double>());
+					contracts.get(e).put(Delegation.OUTCOME_FAILURE, im);
+					contracts.get(e).put(Delegation.OUTCOME_SUCCESS, ip);
+				}
+				catch (OptimizationException e1) {
+					System.err.println("Optimiser failed.");
+				}
+			}
+			
+			// now pick the effort level which maximises EU
+			double agentEU = 0;
+			EffortLevel bestEffort = null;
+			for(Entry<EffortLevel,Map<Integer,Double>> contract : contracts.entrySet())
+			{
+				EffortLevel e = contract.getKey();
+				double p = 0.5;
+				if(conditionalRatings.containsKey(e))
+					p = conditionalRatings.get(e);
+				double eu = contract.getValue().get(Delegation.OUTCOME_SUCCESS)*p +
+									contract.getValue().get(Delegation.OUTCOME_FAILURE)*(1-p);
+				if(eu > agentEU) {
+					agentEU = eu;
+					bestEffort = e;
+				}
+			}
+			
+			// if this agent offers the best EU so far, set it to be the best
+			if(agentEU > bestEU) 
+			{
+				bestAgent = agent;
+				bestEU = agentEU;
+				bestContract = contracts.get(bestEffort);
+			}
+		}
+				
+		// NOTE: Up till now we have made it possible to have as many effort levels as desired. However due to running out of time,
+		// from this point on, (i.e. the delegation object) the assumption is 2 effort levels and 2 outcomes
+		
+		// if the best available agent is a worse bet than doing it ourselves, return a contract for ourselves
+		// by using the <= relation, we're making the trustor a bit risk averse - if the EUs are the same,
+		// the trustor will still prefer to do it alone.
+		
+		// if no it's better to abstain, delegate to ourselves
+		if(bestEU < uAbs)
+			return new Delegation(owner,owner,uAbs, uAbs,uAbs,Delegation.DELEGATION_SELF);
+		// return the contract
+		return new Delegation(owner, bestAgent, bestContract.get(Delegation.OUTCOME_SUCCESS),bestContract.get(Delegation.OUTCOME_FAILURE),bestEU,Delegation.DELEGATION_UNMONITORED);
+	}
+
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> agents, double uSucc,
+			double uFail, double uAbs, double monitoringCost) {
+		// if the PA model is called in this way, just pass it to the DT simple model
+		return new TrustorDTBasicDM().selectAgent(agents, uSucc, uFail, uAbs, monitoringCost);
+	}
+	
+
+}

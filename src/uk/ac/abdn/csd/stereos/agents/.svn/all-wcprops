@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/Astice/!svn/ver/2/stereos/src/uk/ac/abdn/csd/stereos/agents
+END
+Experience.java
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/Experience.java
+END
+Profile.java
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/Profile.java
+END
+EffortLevel.java
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/EffortLevel.java
+END
+Delegation.java
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/Delegation.java
+END
+PerceptualBias.java
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/PerceptualBias.java
+END
+Agent.java
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/Agent.java
+END
+BehaviouralBias.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/agents/BehaviouralBias.java
+END

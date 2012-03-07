@@ -1,0 +1,134 @@
+package uk.ac.abdn.csd.stereos.util.viewer;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.trust.TrustModel;
+import uk.ac.abdn.csd.stereos.trust.sl.Opinion;
+
+/**
+ * Record of the state of the experiment at each time step
+ * @author cburnett
+ *
+ */
+public class State {
+	
+	/**
+	 * The timestep this event occured at
+	 */
+	int timeStep;
+	
+	/**
+	 * Record of the agents and principals in the society.
+	 * All the links between these (i.e. opinions) are
+	 * stored in the agent objects.
+	 */
+	private List<Agent> agents;
+	private List<Agent> trustors;
+	
+	/**
+	 * Teams in this state
+	 */
+	private List<List<Agent>> teams;
+	
+	/**
+	 * Agent assignment to teams
+	 */
+	private Map<Agent,List<Agent>> assignments;
+	
+	/**
+	 * Opinion graph
+	 */
+	private Map<Agent,Map<Agent,Opinion>> opinions;
+	
+	private Map<Agent,Agent> interactors;
+
+
+	/**
+	 * Constructor for a state specifying it completely.
+	 * @param agents
+	 * @param trustors
+	 * @param teams
+	 * @param assignments
+	 */
+	public State(List<Agent> agents, List<Agent> trustors,
+			List<List<Agent>> teams, Map<Agent, List<Agent>> assignments, Map<Agent,Agent> interactors) {
+		// essentially make a copy of the whole state - this is what he'd have been doing in
+		// the file anyway...
+		this.agents = new ArrayList<Agent>(agents);
+		this.trustors = new ArrayList<Agent>(trustors);
+		this.teams = new ArrayList<List<Agent>>(teams);
+		this.assignments = new HashMap<Agent,List<Agent>>(assignments);
+		this.interactors = new HashMap<Agent,Agent>(interactors);
+		opinions = new HashMap<Agent,Map<Agent,Opinion>>();
+
+		// Build an opinion 'graph' for this state
+		for(Agent t : trustors)
+		{
+			TrustModel tm = t.getTrustModel();
+			//opinions.put(t, t.getTrustModel().getOpinions());
+			HashMap<Agent,Opinion> tops = new HashMap<Agent,Opinion>();
+			for(Agent a : agents) 
+			{
+				Opinion thisOp = tm.opinionQuery(a);
+				if(thisOp.getUncertainty() < 1)
+					tops.put(a, thisOp);
+			}
+			opinions.put(t, tops);
+		}
+
+
+	}
+	
+	
+	
+	public Map<Agent,Map<Agent,Opinion>> getOpinions()
+	{
+		return opinions;
+	}
+	public List<Agent> getAgents() {
+		return agents;
+	}
+
+	public void setAgents(List<Agent> agents) {
+		this.agents = agents;
+	}
+
+	public List<Agent> getTrustors() {
+		return trustors;
+	}
+
+	public void setTrustors(List<Agent> trustors) {
+		this.trustors = trustors;
+	}
+
+	public List<List<Agent>> getTeams() {
+		return teams;
+	}
+
+	public void setTeams(List<List<Agent>> teams) {
+		this.teams = teams;
+	}
+
+	public Map<Agent, List<Agent>> getAssignments() {
+		return assignments;
+	}
+
+	public void setAssignments(Map<Agent, List<Agent>> assignments) {
+		this.assignments = assignments;
+	}
+
+	public Map<Agent, Agent> getInteractors() {
+		return interactors;
+	}
+	
+	public int numAgents()
+	{
+		return agents.size()+trustors.size();
+	}
+	
+}

@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/Astice/!svn/ver/5/stereos/src/uk/ac/abdn/csd/stereos/decision/trustee
+END
+TrusteeDTBasicDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustee/TrusteeDTBasicDM.java
+END
+TrusteeBiasedDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustee/TrusteeBiasedDM.java
+END
+TrusteeDecisionModel.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustee/TrusteeDecisionModel.java
+END
+TrusteeDefaultDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustee/TrusteeDefaultDM.java
+END

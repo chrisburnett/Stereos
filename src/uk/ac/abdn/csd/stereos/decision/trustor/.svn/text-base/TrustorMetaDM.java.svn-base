@@ -1,0 +1,65 @@
+package uk.ac.abdn.csd.stereos.decision.trustor;
+
+import java.util.Map;
+
+import uk.ac.abdn.csd.stereos.agents.Agent;
+import uk.ac.abdn.csd.stereos.agents.Delegation;
+import uk.ac.abdn.csd.stereos.agents.EffortLevel;
+/**
+ * A 'meta' model which runs the other models
+ * 
+ * @author cburnett
+ *
+ */
+
+public class TrustorMetaDM extends TrustorDecisionModel {
+
+	/**
+	 * Needs to call the other models in turn, and pick the best contract
+	 */
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> unconditionalOpinions,
+			Map<Agent, Map<EffortLevel, Double>> conditionalOpinions,
+			double uSucc, double uFail, double uAbs, double monitoringCost) {
+		
+		Delegation[] alternatives = new Delegation[2];
+		
+		// simple model
+		TrustorDecisionModel simpleDT = new TrustorDTBasicDM();
+		alternatives[0] = simpleDT.selectAgent(unconditionalOpinions, uSucc, uFail, uAbs, monitoringCost);
+		System.out.println("DT:" + alternatives[0].getTrustorEU());
+		// unmonitored-conditional
+		TrustorDecisionModel simplePA = new TrustorPABasicDM();
+		alternatives[1] = simplePA.selectAgent(unconditionalOpinions, conditionalOpinions, uSucc, uFail, uAbs, monitoringCost);
+		System.out.println("PA:" + alternatives[1].getTrustorEU());
+
+		// monitored-conditional
+		//todo
+		// unmonitored-RI
+		//todo
+		// calculate all in turn, get best delegations
+		
+		
+		
+		// return the best
+		double best = 0;
+		Delegation bestDel = null;
+		for(Delegation d : alternatives)
+			if(d.getTrustorEU() >= best) 
+			{
+				best = d.getTrustorEU();
+				bestDel = d;
+			}
+		System.out.println(bestDel.getType());
+		return bestDel;
+	
+	}
+
+	@Override
+	public Delegation selectAgent(Map<Agent, Double> agents, double uSucc,
+			double uFail, double uAbs, double monitoringCost) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+}

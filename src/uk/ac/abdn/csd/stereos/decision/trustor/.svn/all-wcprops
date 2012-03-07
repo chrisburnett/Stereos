@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/Astice/!svn/ver/5/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor
+END
+TrustorDTBasicDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor/TrustorDTBasicDM.java
+END
+TrustorPABasicDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor/TrustorPABasicDM.java
+END
+TrustorMetaDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor/TrustorMetaDM.java
+END
+TrustorDecisionModel.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor/TrustorDecisionModel.java
+END
+TrustorMostTrustedDM.java
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/Astice/!svn/ver/11/stereos/src/uk/ac/abdn/csd/stereos/decision/trustor/TrustorMostTrustedDM.java
+END

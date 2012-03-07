@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry excluding="uk/ac/abdn/csd/stereos/trust/sl/DirectStereoM5PSL.java|uk/ac/abdn/csd/stereos/gui/ExperimentGUI.java" kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry exported="true" kind="lib" path="lib/weka.jar" sourcepath="lib/weka-src.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/Users/cburnett/Documents/phd/weka/doc/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry exported="true" kind="lib" path="lib/core.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/commons-lang-2.5-javadoc.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/commons-lang-2.5.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/stereos/lib/commons-lang-2.5-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry exported="true" kind="lib" path="lib/pdf.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/itext.jar"/>
+	<classpathentry kind="lib" path="lib/weka-src.jar"/>
+	<classpathentry kind="lib" path="lib/commons-math-2.1.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
